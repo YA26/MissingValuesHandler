@@ -338,11 +338,10 @@ class MissingDataHandler():
             builds a scaled proximity matrix.
             1- We run all the data down the first tree and output predictions.
             2- If two samples fall in the same node (same predictions) we count it as 1.
-            3- We do the same for every single tree, sum up the proximity matrix and divide by the total number of estimators.
+            3- We do the same for every single tree, sum up the proximity matrices and divide by the total number of estimators.
         '''
         proximity_matrix = np.zeros((len(encoded_features), len(encoded_features)))
         predictions = estimator.predict(encoded_features)
-
         for row, column in np.ndindex(proximity_matrix.shape):
             #row and column each represents a specific observation.
             #Example: observation number 7 equals row 7 and observation number 5 equals column 5.
