@@ -59,6 +59,11 @@ class MissingDataHandler():
                  data_type_identifier_model,
                  mappings,
                  encoder):
+        
+        #Parallelization variable 
+        self.__parrallel                        = Parallel(n_jobs=multiprocessing.cpu_count())
+        
+        #Main variables
         self.__data_type_identifier_object      = data_type_identifier_object
         self.__data_type_identifier_model       = data_type_identifier_model
         self.__mappings                         = mappings
@@ -82,10 +87,7 @@ class MissingDataHandler():
         self.__all_weighted_averages            = defaultdict(list)
         self.__all_weighted_averages_copy       = defaultdict(list)
         self.__has_converged                    = False
-        
-        #Parallelization variable 
-        self.__parrallel                        = Parallel(n_jobs=multiprocessing.cpu_count())
-        
+                
         #Random forest variables
         self.__estimator                        = None
         self.__n_estimators                     = None
