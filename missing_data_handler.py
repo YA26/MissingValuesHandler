@@ -83,8 +83,8 @@ class MissingDataHandler():
         self.__all_weighted_averages_copy       = defaultdict(list)
         self.__has_converged                    = False
         
-        #Parallelization variables 
-        self.__parrallel = Parallel(n_jobs=multiprocessing.cpu_count())
+        #Parallelization variable 
+        self.__parrallel                        = Parallel(n_jobs=multiprocessing.cpu_count())
         
         #Random forest variables
         self.__estimator                        = None
