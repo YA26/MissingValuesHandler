@@ -5,11 +5,13 @@ Created on Mon Nov  4 18:46:50 2019
 @author: Yann Avok
 """
 from custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
+from joblib import Parallel, delayed
 from collections import defaultdict
 from colorama import Back, Style
 from copy import copy
 import numpy as np
 import pandas as pd
+import multiprocessing
 
 
 class MissingDataHandler():
@@ -80,6 +82,9 @@ class MissingDataHandler():
         self.__all_weighted_averages            = defaultdict(list)
         self.__all_weighted_averages_copy       = defaultdict(list)
         self.__has_converged                    = False
+        
+        #Parallelization variables 
+        self.__parrallel = Parallel(n_jobs=multiprocessing.cpu_count())
         
         #Random forest variables
         self.__estimator                        = None
@@ -327,28 +332,24 @@ class MissingDataHandler():
             self.__estimator.n_estimators   -= additional_estimators
             self.__estimator                = precedent_estimator
             print("\nThe model with score {} has been kept\n".format(precedent_out_of_bag_score))
-                               
-    def __build_proximity_matrix(self):
+                    
+    def __build_proximity_matrix(estimator, encoded_features):
         '''
-        builds a scaled proximity matrix.
-        1- We run all the data down the first tree and output predictions.
-        2- If two samples fall in the same node (same predictions) we count it as 1.
-        3- We run all the data down the rest of the trees and do the same(we add 1 every single time two samples have the same predictions).
-        4- We divide the whole matrix by the total number of estimators.
+            builds a scaled proximity matrix.
+            1- We run all the data down the first tree and output predictions.
+            2- If two samples fall in the same node (same predictions) we count it as 1.
+            3- We do the same for every single tree, sum up the proximity matrix and divide by the total number of estimators.
         '''
-        print("\n{} {} estimators have been counted {}".format(Back.GREEN, self.__estimator.n_estimators, Style.RESET_ALL))
-        proximity_matrix = np.zeros((len(self.__encoded_features), len(self.__encoded_features)))
-        for estimator_number, estimator in enumerate(self.__estimator.estimators_, 1):
-            print("\n- Estimator number {} is being used for predictions...".format(estimator_number))
-            predictions = estimator.predict(self.__encoded_features)
-            for row, column in np.ndindex(proximity_matrix.shape):
-                #row and column each represents a specific observation.
-                #Example: observation number 7 equals row 7 and observation number 5 equals column 5.
-                #So at position (7, 5), we will have a number giving an information about how close those two observations are.
-                if predictions[row]==predictions[column]:
-                    proximity_matrix[row, column]+=1        
-        self.__proximity_matrix = proximity_matrix/self.__estimator.n_estimators
-        print("\nAll estimators have been used!")
+        proximity_matrix = np.zeros((len(encoded_features), len(encoded_features)))
+        predictions = estimator.predict(encoded_features)
+
+        for row, column in np.ndindex(proximity_matrix.shape):
+            #row and column each represents a specific observation.
+            #Example: observation number 7 equals row 7 and observation number 5 equals column 5.
+            #So at position (7, 5), we will have a number giving an information about how close those two observations are.
+            if predictions[row]==predictions[column]:
+                proximity_matrix[row, column]=1        
+        return proximity_matrix
                
     def __compute_weighted_averages(self, numerical_features_decimals):
         '''
@@ -515,7 +516,8 @@ class MissingDataHandler():
               verbose=0,
               warm_start=True,
               path_to_save_dataset=None,
-              forbidden_variables_list=[]):
+              forbidden_variables_list=[],
+              __build_proximity_matrix=__build_proximity_matrix):
         '''
         This is the main function. At run time, every other private functions will be exceuted one after another.
         '''
@@ -567,8 +569,13 @@ class MissingDataHandler():
                 self.__fit_and_evaluate_ensemble_model(additional_estimators)
                 print("MODEL FITTED AND EVALUATED!")
                 
-                print("\n3- BUILDING PROXIMITY MATRIX...")
-                self.__build_proximity_matrix()
+                print("\n3- BUILDING PROXIMITY MATRIX...")  
+                print("\n{} {} estimators have been counted {}\nEach estimator is being used for predictions...".format(Back.GREEN, self.__estimator.n_estimators, Style.RESET_ALL))
+                all_estimators_list     = self.__estimator.estimators_
+                number_of_estimators    = self.__estimator.n_estimators
+                proximity_matrices      = self.__parrallel(delayed(__build_proximity_matrix)(estimator, self.__encoded_features) for estimator in all_estimators_list)
+                sum_proximity_matrices  = sum(proximity_matrices)
+                self.__proximity_matrix = sum_proximity_matrices/number_of_estimators
                 print("\nPROXIMITY MATRIX BUILT!\n")
                       
                 print("\n4- COMPUTING WEIGHT AVERAGES...")
