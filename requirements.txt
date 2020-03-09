@@ -3,5 +3,4 @@ tensorflow==2.0.1
 colorama==0.4.1
 numpy==1.17.4
 pandas==0.25.1
-pickleshare==0.7.5
-joblib==0.13.2
+pickle
