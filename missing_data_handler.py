@@ -100,12 +100,12 @@ class MissingDataHandler():
         self.__max_leaf_nodes                   = None
         self.__min_impurity_decrease            = None
         self.__min_impurity_split               = None
-        self.__bootstrap                        = None
-        self.__oob_score                        = None
+        self.__bootstrap                        = True
+        self.__oob_score                        = True
         self.__n_jobs                           = None 
         self.__random_state                     = None
         self.__verbose                          = None
-        self.__warm_start                       = None
+        self.__warm_start                       = True
         
         
     def get_features_type_predictions(self):
@@ -510,12 +510,9 @@ class MissingDataHandler():
               max_leaf_nodes=None,
               min_impurity_decrease=0.0, 
               min_impurity_split=None,
-              bootstrap=True,
-              oob_score=True,
               n_jobs=-1,
               random_state=None,
               verbose=0,
-              warm_start=True,
               path_to_save_dataset=None,
               forbidden_variables_list=[],
               __build_proximity_matrix=__build_proximity_matrix):
@@ -535,12 +532,9 @@ class MissingDataHandler():
         self.__max_leaf_nodes           = max_leaf_nodes
         self.__min_impurity_decrease    = min_impurity_decrease 
         self.__min_impurity_split       = min_impurity_split
-        self.__bootstrap                = bootstrap
-        self.__oob_score                = oob_score
         self.__n_jobs                   = n_jobs 
         self.__random_state             = random_state
         self.__verbose                  = verbose
-        self.__warm_start               = warm_start
         self.__has_converged            = False
         total_iterations                = 0
         
