@@ -175,7 +175,7 @@ class MissingDataHandler():
         
     def get_proximity_matrix(self):
         '''
-        Retrieves the last proximity matrix built with the last random forest(the most optimal one)
+        Retrieves the last proximity matrix built with the last random forest(the optimal one)
         '''
         return self.__proximity_matrix
     
