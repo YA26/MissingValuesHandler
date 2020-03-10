@@ -33,7 +33,7 @@ class MissingDataHandler():
         - private method: __make_initial_guesses
         
     3- We encode the features and the target variables if they need to be encoded:
-        - private method: __encode_features(As of yet, decision trees in Scikit-Learn don't handle categorical variable. So encoding is necessary)
+        - private method: __encode_features(As of yet, decision trees in Scikit-Learn don't handle categorical variables. So encoding is necessary)
         - private method: __encode_target_variable
     
     4- We build our model, fit it and evaluate it (we keep the model having the best out of bag score). We then use it to build the proximity matrix:
