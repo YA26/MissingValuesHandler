@@ -368,7 +368,7 @@ class MissingDataHandler():
             Fits and evaluates the model. 
             1- We compare the out of bag score at time t-1 with the one at time t.
             2- If the latter is lower than the former or equals to it, we stop fitting the model and we keep the one at t-1.
-            3- If it's the other way around, we add more estimators to the total number of estimators we currently have.
+            3- If it's the other way around, we add more estimators to the total number of estimators we currently have and pursue training.
             '''  
             #Those are kick start values. '10**-5' was chosen for current_out_of_bag_score. But why?
             #Because we want to make sure that no model is bad enough to output a score lower than that.
