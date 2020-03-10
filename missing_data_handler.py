@@ -607,7 +607,7 @@ class MissingDataHandler():
                 self.__compute_weighted_averages(numerical_features_decimals)
                 print("\nWEIGHT AVERAGES COMPUTED!\n")
                         
-                print("\n5- REPLACING NAN VALUES IN ENCODED DATA...")           
+                print("\n5- REPLACING NAN VALUES IN FEATURES DATAFRAME...")           
                 self.__replace_missing_values_in_dataframe()
                 print("\nNAN VALUES REPLACED!\n")
             
