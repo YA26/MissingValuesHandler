@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 
 
-class MissingDataHandler():
+class MissingDataHandler(object):
     '''
     This class uses a random forest to replace missing values in a dataset for samples that have a target value. It doesn't tackle missing values in a new sample.
     The main idea is to use the random forest's definition of proximity to find the values that are best fit to replace the missing ones.
