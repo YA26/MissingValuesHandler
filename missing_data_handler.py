@@ -175,7 +175,7 @@ class MissingDataHandler(object):
         
     def get_proximity_matrix(self):
         '''
-        Retrieves the last proximity matrix built with the last random forest(the optimal one)
+        Retrieves the last proximity matrix built with the last random forest(the most optimal one)
         '''
         return self.__proximity_matrix
     
@@ -255,7 +255,12 @@ class MissingDataHandler(object):
         '''
         Gets the coordinates(row and column) of every empty cell in the features dataset.
         '''
+        #We check if there any missing values in the dataset. If that's not the case, an exception is raised.
+        if not self.__features.isnull().values.any():
+            raise NoMissingValuesError("No missing values were found in the dataset!")
+            
         for feature in self.__features.columns:  
+            #If there's no missing values in the current feature, we do not bother carrying on.
             if self.__features[feature].isnull().values.any():
                 #We use the index to get the row coordinate of every empty cell for a given column(feature)  
                 empty_cells_checklist = self.__features[feature].isnull()
@@ -263,11 +268,7 @@ class MissingDataHandler(object):
                 column_coordinate     = feature
                 for row_coordinate in row_coordinates:
                     self.__missing_values_coordinates.append((row_coordinate, column_coordinate))
-                    
-        #We check if any nan values was retrieved. If that's not the case, an exception is raised.
-        if not self.__missing_values_coordinates:
-            raise NoMissingValuesError("No missing values were found in the dataset!")
-        
+                        
         #We don't forget to get the total number of missing values for future purposes.
         self.__number_of_nan_values = len(self.__missing_values_coordinates)
     
@@ -368,7 +369,7 @@ class MissingDataHandler(object):
             Fits and evaluates the model. 
             1- We compare the out of bag score at time t-1 with the one at time t.
             2- If the latter is lower than the former or equals to it, we stop fitting the model and we keep the one at t-1.
-            3- If it's the other way around, we add more estimators to the total number of estimators we currently have and pursue training.
+            3- If it's the other way around, we add more estimators to the total number of estimators we currently have.
             '''  
             #Those are kick start values. '10**-5' was chosen for current_out_of_bag_score. But why?
             #Because we want to make sure that no model is bad enough to output a score lower than that.
@@ -607,7 +608,7 @@ class MissingDataHandler(object):
                 self.__compute_weighted_averages(numerical_features_decimals)
                 print("\nWEIGHT AVERAGES COMPUTED!\n")
                         
-                print("\n5- REPLACING NAN VALUES IN FEATURES DATAFRAME...")           
+                print("\n5- REPLACING NAN VALUES IN ENCODED DATA...")           
                 self.__replace_missing_values_in_dataframe()
                 print("\nNAN VALUES REPLACED!\n")
             
