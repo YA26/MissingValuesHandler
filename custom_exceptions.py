@@ -31,7 +31,7 @@ class TargetVariableNameError(Exception):
     
     
 class NoMissingValuesError(Exception):
-   """Raised when the there are no missing values in the dataset"""
+   """Raised when there are no missing values in the dataset"""
    
    def __init__(self, message=None):
        if message:
