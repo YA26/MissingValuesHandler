@@ -569,7 +569,7 @@ class MissingDataHandler(object):
         total_iterations                = 0
         
         #Initializing training
-        print("Getting ready...\nMaking initial guesses\nEncoding the features...")
+        print("Getting ready...\nMaking initial guesses...\n")
         self.__original_data = data.copy()
         self.__check_variables_name_validity()
         self.__separate_features_and_target_variable(target_variable_name)  
