@@ -3,7 +3,7 @@ import tensorflow as tf
 import pandas as pd
 import pickle
 
-class DataTypeIdentifier():
+class DataTypeIdentifier(object):
     '''
     This class is used to predict if a certain variable is either categorical or numerical.
     '''
