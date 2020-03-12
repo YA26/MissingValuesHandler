@@ -1,6 +1,6 @@
-# Missing_values_handler
-Automatic replacement of missing values with a Random Forest
+# Handling missing values with a random forest automatically
 
+Random forest's definition of proximity is a solution that can be used to replace missing values in a dataset.
 
 Do you want to give it a try?
 
