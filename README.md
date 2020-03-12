@@ -7,9 +7,9 @@ If you want to know more about how that implementation was done, you can read th
 
 ## Do you want to give it a try?
 
-- Make sure all dependencies are installed. If that’s not the case you can install them with pip install requirements.txt
+- Make sure all dependencies are installed. If that’s not the case you can install them with ```pip install requirements.txt```
 
-- Open the *run.py* file
+- Open the **run.py** file
 
 - Import your dataset or use those that are in the repository
 
