@@ -8,7 +8,8 @@ from sklearn.ensemble import RandomForestClassifier
 from missing_data_handler import MissingDataHandler
 from data_type_identifier import DataTypeIdentifier
 from tensorflow.keras.models import load_model
-import pandas as pd
+from os.path import join
+from pandas import read_csv
 
 """
 ############################################
@@ -16,8 +17,8 @@ import pandas as pd
 ############################################
 """
 data_type_identifier        = DataTypeIdentifier()
-data_type_identifier_model  = load_model("./data_type_identifier_model/data_type_identifier.h5")
-mappings                    = data_type_identifier.load_variables("./saved_variables/mappings.pickle")
+data_type_identifier_model  = load_model(join("data_type_identifier_model","data_type_identifier.h5"))
+mappings                    = data_type_identifier.load_variables(join("saved_variables", "mappings.pickle"))
 
 """
 ############################################
@@ -35,7 +36,7 @@ missing_data_handler = MissingDataHandler(data_type_identifier_object=data_type_
 """
 
 
-data = pd.read_csv("./data/Loan_Approval.csv", sep=",", index_col=False)
+data = read_csv(join("data","Loan_Approval.csv"), sep=",", index_col=False)
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
 missing_data_handler.set_ensemble_model_parameters(n_estimators=40, additional_estimators=20)
 
@@ -44,7 +45,7 @@ new_data = missing_data_handler.train(data=data,
                                       base_estimator=RandomForestClassifier,
                                       target_variable_name="Loan_Status",  
                                       n_iterations_for_convergence=5,
-                                      path_to_save_dataset="./data/Loan_approval_no_nan.csv",
+                                      path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"),
                                       forbidden_variables_list=["Credit_History"])
 
 
