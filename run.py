@@ -7,6 +7,7 @@ Created on Mon Nov  4 18:46:50 2019
 from sklearn.ensemble import RandomForestClassifier
 from missing_data_handler import MissingDataHandler
 from data_type_identifier import DataTypeIdentifier
+from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import load_model
 from os.path import join
 from pandas import read_csv
@@ -16,7 +17,7 @@ from pandas import read_csv
 ########### COMPLEMENTARY OBJECTS ##########
 ############################################
 """
-data_type_identifier        = DataTypeIdentifier()
+data_type_identifier        = DataTypeIdentifier(LabelEncoder)
 data_type_identifier_model  = load_model(join("data_type_identifier_model","data_type_identifier.h5"))
 mappings                    = data_type_identifier.load_variables(join("saved_variables", "mappings.pickle"))
 
