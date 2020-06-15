@@ -18,8 +18,8 @@ If you want to know more about how that implementation was done, you can read th
 - Set up essentials parameters like the number of iterations, the additional trees, the base estimator…
 
 - The method "train()" possess among others two important arguments:
-      *forbidden_variables_list: variables that don't require encoding will be put in that list
-      *ordinal_variables_list: suited for ordinal categorical variables encoding
+      $forbidden_variables_list: variables that don't require encoding will be put in that list
+      $ordinal_variables_list: suited for ordinal categorical variables encoding
 
 ## Coding example:
 
