@@ -18,7 +18,7 @@ If you want to know more about how that implementation was done, you can read th
 
 - Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
 
-- The method **train()** possesses among others three important arguments:
+- The method **train()** possesses three important arguments among others:
      - **forbidden_variables_list:** variables that don't require encoding will be put in that list
      - **ordinal_variables_list:** suited for ordinal categorical variables encoding
      - **n_iterations_for_convergence:** checks after n rounds if the predicted values converged. 4 or 5 rounds are usually enough
