@@ -67,7 +67,9 @@ new_data = missing_data_handler.train(data=data,
 features_type_prediction            = missing_data_handler.get_features_type_predictions()
 target_variable_type_prediction     = missing_data_handler.get_target_variable_type_prediction()
 encoded_features                    = missing_data_handler.get_encoded_features()
-#The target variable won't be encoded if it is numerical or if the user requires it by putting its name in 'forbidden_variables_list' 
+"""
+#The target variable won't be encoded if it is numerical or if the user requires it(by putting the variable name in forbidden_variables_list') 
+"""
 encoded_target_variable             = missing_data_handler.get_target_variable_encoded()
 final_proximity_matrix              = missing_data_handler.get_proximity_matrix()
 final_distance_matrix               = missing_data_handler.get_distance_matrix()
