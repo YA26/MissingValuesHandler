@@ -16,7 +16,7 @@ If you want to know more about how that implementation was done, you can read th
 
 - Set up the parameters of the random forest. The main difference resides in the criterion: it is **gini** or **entropy** for a random forest classifier and **mse** (mean square error) for a regressor.
 
-- Set up essential parameters like the number of iterations, the additional trees, the base estimator…
+- Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
 
 - The method **train()** possesses among others three important arguments:
      - **forbidden_variables_list:** variables that don't require encoding will be put in that list
