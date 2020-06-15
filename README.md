@@ -1,5 +1,5 @@
 # Handling missing values with a random forest automatically
-###For supervised learning
+### For supervised learning
 
 Random forest's definition of proximity is a solution that can be used to replace missing values in a dataset.
 
