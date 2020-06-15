@@ -10,7 +10,7 @@ If you want to know more about how that implementation was done, you can read th
 
 - You can get the library with ```pip install MissingValuesHandler```
 
-- Import your dataset or use those that are in the repository
+- Import a dataset
 
 - Choose what type of random forest you want to apply(regressor or classifier)
 
