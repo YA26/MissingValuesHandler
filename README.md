@@ -22,6 +22,7 @@ If you want to know more about how that implementation was done, you can read th
 
       - forbidden_variables_list: variables that don't require encoding will be put in that list
       - ordinal_variables_list: suited for ordinal categorical variables encoding
+      - n_iterations_for_convergence: checks after n rounds if predicted values converged. 4 or 5 rounds are usually enough
 
 ## Coding example:
 
