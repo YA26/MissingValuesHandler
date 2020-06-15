@@ -10,8 +10,9 @@ from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from joblib import Parallel, delayed
 from collections import defaultdict
+from inspect import getsourcefile
 from colorama import Back, Style
-from os.path import join
+from os.path import join, dirname
 from copy import copy
 import multiprocessing
 import pandas as pd
@@ -61,8 +62,8 @@ class MissingDataHandler(object):
     def __init__(self):   
         #Data type identifier variables
         self.__data_type_identifier_object      = DataTypeIdentifier(LabelEncoder)
-        self.__data_type_identifier_model       = load_model(join("data_type_identifier_model","data_type_identifier.h5"))
-        self.__mappings                         = self.__data_type_identifier_object.load_variables(join("saved_variables", "mappings.pickle"))
+        self.__data_type_identifier_model       = load_model(join(dirname(getsourcefile(MissingDataHandler)), "data_type_identifier_model", "data_type_identifier.h5"))
+        self.__mappings                         = self.__data_type_identifier_object.load_variables(join(dirname(getsourcefile(MissingDataHandler)), "saved_variables", "mappings.pickle"))
 
         #Parallelization variable 
         self.__parallel                         = Parallel(n_jobs=multiprocessing.cpu_count())
