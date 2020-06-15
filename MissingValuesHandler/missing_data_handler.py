@@ -4,8 +4,8 @@ Created on Mon Nov  4 18:46:50 2019
 
 @author: Yann Avok
 """
-from custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
-from data_type_identifier import DataTypeIdentifier
+from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
+from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from joblib import Parallel, delayed
