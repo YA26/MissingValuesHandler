@@ -19,6 +19,8 @@ If you want to know more about how that implementation was done, you can read th
 
 - Set up essentials parameters like the number of iterations, the additional trees, the base estimator…
 
+## Coding example:
+
 ```python
 from MissingValuesHandler.missing_data_handler import MissingDataHandler
 from sklearn.ensemble import RandomForestClassifier
