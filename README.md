@@ -44,8 +44,6 @@ missing_data_handler = MissingDataHandler()
 ############### RUN TIME ###################
 ############################################
 """
-
-
 data = read_csv(join("data","Loan_Approval.csv"), sep=",", index_col=False)
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
 missing_data_handler.set_ensemble_model_parameters(n_estimators=40, additional_estimators=20)
