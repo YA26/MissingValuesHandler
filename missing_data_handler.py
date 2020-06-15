@@ -5,10 +5,13 @@ Created on Mon Nov  4 18:46:50 2019
 @author: Yann Avok
 """
 from custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
+from data_type_identifier import DataTypeIdentifier
+from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from joblib import Parallel, delayed
 from collections import defaultdict
 from colorama import Back, Style
+from os.path import join
 from copy import copy
 import multiprocessing
 import pandas as pd
@@ -55,17 +58,16 @@ class MissingDataHandler(object):
          - public  method: train
     '''
     
-    def __init__(self,
-                 data_type_identifier_object,
-                 data_type_identifier_model,
-                 mappings):      
+    def __init__(self):   
+        #Data type identifier variables
+        self.__data_type_identifier_object      = DataTypeIdentifier(LabelEncoder)
+        self.__data_type_identifier_model       = load_model(join("data_type_identifier_model","data_type_identifier.h5"))
+        self.__mappings                         = self.__data_type_identifier_object.load_variables(join("saved_variables", "mappings.pickle"))
+
         #Parallelization variable 
-        self.__parrallel                        = Parallel(n_jobs=multiprocessing.cpu_count())
+        self.__parallel                         = Parallel(n_jobs=multiprocessing.cpu_count())
         
         #Main variables
-        self.__data_type_identifier_object      = data_type_identifier_object
-        self.__data_type_identifier_model       = data_type_identifier_model
-        self.__mappings                         = mappings
         self.__original_data                    = None 
         self.__features                         = None
         self.__target_variable                  = None
@@ -451,13 +453,13 @@ class MissingDataHandler(object):
                 '''
                 For every single categorical feature:
                 '''
-                #For categorical variables, we're going to take into account the frequency of every modality per feature
+                #For categorical variables, we're going to take into account the frequency of every modality(per feature)
                 frequencies_per_modality    = self.__features[nan_feature_name].value_counts()
                 proportion_per_modality     = frequencies_per_modality/np.sum(frequencies_per_modality)
                 
-                #We iterate over the values Ex: 0 and 1 if the categorical variable is binary AND 0,1,2... for a multinomial one
+                #We iterate over the values Ex: 0 and 1 if the categorical variable is binary
                 for modality in proportion_per_modality.index.values:
-                    #We get all the samples presenting the modality.
+                    #We get all the samples containing the modality.
                     checklist   = self.__features[nan_feature_name]==modality
                     samples     = self.__features[nan_feature_name].index[checklist].values
                     
@@ -599,7 +601,7 @@ class MissingDataHandler(object):
                 print("\n{} {} estimators have been counted {}\nEach estimator is being used for predictions...".format(Back.GREEN, self.__estimator.n_estimators, Style.RESET_ALL))
                 all_estimators_list     = self.__estimator.estimators_
                 number_of_estimators    = self.__estimator.n_estimators
-                proximity_matrices      = self.__parrallel(delayed(self.__build_proximity_matrix)(estimator, self.__encoded_features) for estimator in all_estimators_list)
+                proximity_matrices      = self.__parallel(delayed(self.__build_proximity_matrix)(estimator, self.__encoded_features) for estimator in all_estimators_list)
                 sum_proximity_matrices  = sum(proximity_matrices)
                 self.__proximity_matrix = sum_proximity_matrices/number_of_estimators
                 print("\nPROXIMITY MATRIX BUILT!\n")
