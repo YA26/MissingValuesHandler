@@ -9,7 +9,7 @@ setup(
   author = 'AVOKANDOTO',                   # Type in your name
   author_email = 'yannavok2@gmail.com',      # Type in your E-Mail
   url = 'https://github.com/YA26/Missing_values_handler',   # Provide either the link to your github or to your website
-  download_url = 'https://github.com/YA26/Missing_values_handler/archive/v_01.tar.gz',    # I explain this later on
+  download_url = 'https://github.com/YA26/Missing_values_handler/archive/v_02.tar.gz',    # I explain this later on
   keywords = ['SOME', 'MEANINGFULL', 'KEYWORDS'],   # Keywords that define your package best
   install_requires=[            # I get to this in a second
           'scikit-learn',
