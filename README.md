@@ -7,17 +7,19 @@ If you want to know more about how that implementation was done, you can read th
 
 ## Do you want to give it a try?
 
-- Make sure all dependencies are installed. If that’s not the case you can install them with ```pip install requirements.txt```
-
-- Open the **run.py** file
+- You can get the library with ```pip install MissingValuesHandler```
 
 - Import your dataset or use those that are in the repository
 
-- Choose what type of random forest you will use(regressor or classifier)
+- Choose what type of random forest you want to apply(regressor or classifier)
 
 - Set up the parameters of the random forest you chose. The main difference resides in the criterion: it is gini or entropy for a random forest classifier and mse(mean square error) for a regressor.
 
 - Set up essentials parameters like the number of iterations, the additional trees, the base estimator…
+
+- The method "train()" possess among others two important arguments:
+      *forbidden_variables_list: variables that don't require encoding will be put in that list
+      *ordinal_variables_list: suited for ordinal categorical variables encoding
 
 ## Coding example:
 
