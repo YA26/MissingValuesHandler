@@ -73,4 +73,5 @@ final_proximity_matrix              = missing_data_handler.get_proximity_matrix(
 final_distance_matrix               = missing_data_handler.get_distance_matrix()
 weighted_averages                   = missing_data_handler.get_all_weighted_averages()
 converged_values                    = missing_data_handler.get_converged_values()
-non_converged_values                = missing_data_handler.get_diverged_values()
+diverged_values                     = missing_data_handler.get_diverged_values()
+
