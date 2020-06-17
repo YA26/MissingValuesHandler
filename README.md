@@ -46,7 +46,7 @@ missing_data_handler = MissingDataHandler()
 """
 data = read_csv(join("data","test_dataset.csv"), sep=",", index_col=False)
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
-missing_data_handler.set_ensemble_model_parameters(n_estimators=20, additional_estimators=5)
+missing_data_handler.set_ensemble_model_parameters(n_estimators=30, additional_estimators=5)
 
 #Launching training and getting our new dataset
 new_data = missing_data_handler.train(data=data, 
