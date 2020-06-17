@@ -378,21 +378,28 @@ class MissingDataHandler(object):
             self.__estimator                = precedent_estimator
             print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
    
-          
+     
     def __build_proximity_matrix(self, predictions):
         '''
-            Builds a proximity matrices.
+            Builds proximity matrices.
             1- We run all the data down the first tree and output predictions.
             2- If two samples fall in the same node (same predictions) we count it as 1.
             3- We do the same for every single tree, sum up the proximity matrices and divide the total by the number of estimators.
-        '''
-        proximity_matrix = np.zeros((len(predictions), len(predictions)))
-        for sample, value in enumerate(predictions):
-            prediction_checklist = np.isin(predictions, value)
-            indices_checklist = np.where(prediction_checklist)[0]
-            proximity_matrix[sample, indices_checklist]=1      
+        ''' 
+        proximity_matrix = np.zeros((len(self.__encoded_features), len(self.__encoded_features)))
+        prediction_dataframe = pd.DataFrame(predictions)
+    
+        while not prediction_dataframe.empty:
+            randomly_chosen_index   = np.random.choice(prediction_dataframe.index.values.tolist(), 1, replace=False)
+            predicted_value         = int(prediction_dataframe.loc[randomly_chosen_index, 0])
+            prediction_checklist    = prediction_dataframe[0]==predicted_value
+            indices_checklist       = prediction_dataframe.index[prediction_checklist].tolist() 
+            indices_checklist       = np.array(indices_checklist)
+            #Using broadcasting to replace null values by 1
+            proximity_matrix[indices_checklist[:, None], indices_checklist]=1
+            prediction_dataframe.drop(indices_checklist, axis=0, inplace=True)
         return proximity_matrix
-   
+
             
     def __compute_weighted_averages(self, numerical_features_decimals):
         '''
