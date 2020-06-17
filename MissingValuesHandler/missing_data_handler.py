@@ -6,18 +6,14 @@ Created on Mon Nov  4 18:46:50 2019
 """
 from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
-from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from joblib import Parallel, delayed
 from collections import defaultdict
-from inspect import getsourcefile
 from colorama import Back, Style
-from os.path import join, dirname
 from copy import copy
 import multiprocessing
 import pandas as pd
 import numpy as np
-
 
 class MissingDataHandler(object):
     '''
@@ -61,10 +57,8 @@ class MissingDataHandler(object):
     
     def __init__(self):   
         #Data type identifier variables
-        self.__data_type_identifier_object      = DataTypeIdentifier(LabelEncoder)
-        self.__data_type_identifier_model       = load_model(join(dirname(getsourcefile(MissingDataHandler)), "data_type_identifier_model", "data_type_identifier.h5"))
-        self.__mappings                         = self.__data_type_identifier_object.load_variables(join(dirname(getsourcefile(MissingDataHandler)), "saved_variables", "mappings.pickle"))
-
+        self.__data_type_identifier_object      = DataTypeIdentifier()
+      
         #Parallelization variable 
         self.__parallel                         = Parallel(n_jobs=multiprocessing.cpu_count())
         
@@ -242,8 +236,7 @@ class MissingDataHandler(object):
         '''
         Predicts if a feature is either categorical or numerical.
         '''
-        features                               = self.__features.copy()
-        self.__features_type_predictions       = self.__data_type_identifier_object.predict(features, self.__mappings, self.__data_type_identifier_model)
+        self.__features_type_predictions = self.__data_type_identifier_object.predict(self.__features)
      
         
     def __predict_target_variable_type(self):
@@ -251,7 +244,7 @@ class MissingDataHandler(object):
         Predicts if the target variable is either categorical or numerical.
         '''
         target_variable                        = self.__target_variable.to_frame()
-        self.__target_variable_type_prediction = self.__data_type_identifier_object.predict(target_variable, self.__mappings, self.__data_type_identifier_model) 
+        self.__target_variable_type_prediction = self.__data_type_identifier_object.predict(target_variable) 
 
 
     def __retrieve_nan_coordinates(self):
@@ -374,23 +367,21 @@ class MissingDataHandler(object):
             2- If the latter is lower than the former or equals to it, we stop fitting the model and we keep the one at t-1.
             3- If it's the other way around, we add more estimators to the total number of estimators we currently have.
             '''  
-            #Those are kick start values. '10**-5' was chosen for current_out_of_bag_score. But why?
-            #Because we want to make sure that no model is bad enough to output a score lower than that.
             precedent_out_of_bag_score  = 0
-            current_out_of_bag_score    = 10**-5
+            current_out_of_bag_score    = 0
             precedent_estimator         = None
-            while current_out_of_bag_score > precedent_out_of_bag_score:
+            while current_out_of_bag_score > precedent_out_of_bag_score or current_out_of_bag_score==0:
                 precedent_estimator = copy(self.__estimator)
                 self.__estimator.fit(self.__encoded_features, self.__target_variable_encoded) 
                 precedent_out_of_bag_score     = current_out_of_bag_score
                 current_out_of_bag_score       = self.__estimator.oob_score_
                 self.__estimator.n_estimators  += self.__additional_estimators
-                print("- Former out of bag score: {}".format(precedent_out_of_bag_score))
-                print("- Current out of bag score: {}".format(current_out_of_bag_score))
+                print("- Former out of bag score: {0:f}".format(precedent_out_of_bag_score))
+                print("- Current out of bag score: {0:f} ".format(current_out_of_bag_score) + "/ {0:+f}".format(current_out_of_bag_score-precedent_out_of_bag_score))
             #We subtract the additional_estimators because we want to keep the configuration of the previous model(i.e the optimal one)
             self.__estimator.n_estimators   -= self.__additional_estimators
             self.__estimator                = precedent_estimator
-            print("\nThe model with score {} has been kept\n".format(precedent_out_of_bag_score))
+            print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
    
          
     @staticmethod   
@@ -586,13 +577,13 @@ class MissingDataHandler(object):
         #Every value has to converge. Otherwise we will be here for another round of n iterations.
         while self.__has_converged==False:
             for iteration in range(1, n_iterations_for_convergence + 1):
-                total_iterations += iteration 
+                total_iterations += 1 
                 self.__encode_features()
-                print("\n\n⚽ ⚽️ ⚽️ ⚽️ ⚽️ ITERATION NUMBER :{} ⚽️ ⚽️ ⚽️ ⚽️ ⚽️\n\n".format(iteration))
+                print("\n##################### ROUND :{} / TOTAL ROUNDS: {} #####################\n".format(iteration, total_iterations))
                 
-                print("\n1- BUILDING THE MODEL...\n")
+                print("\n1- MODEL BULDING...\n")
                 self.__build_ensemble_model(base_estimator)
-                print("\nMODEL BUILT...\n")
+                print("\nMODEL BUILT!\n")
                 
                 print("\n2- FITTING AND EVALUATING THE MODEL...\n")
                 self.__fit_and_evaluate_ensemble_model()
@@ -614,12 +605,12 @@ class MissingDataHandler(object):
                 print("\n5- REPLACING NAN VALUES IN ENCODED DATA...")           
                 self.__replace_missing_values_in_dataframe()
                 print("\nNAN VALUES REPLACED!\n")
-            
-            print("\n\n⚾ ⚾ ⚾ ⚾ ⚾ CHECKING FOR CONVERGENCE...⚾ ⚾ ⚾ ⚾ ⚾ ⚾\n\n")
+                
+            print("\n\n##################### CHECKING FOR CONVERGENCE...#####################\n\n")
             self.__compute_standard_deviations(n_iterations_for_convergence)
             self.__check_for_convergence()
-        print("\nALL VALUES CONVERGED!\n")
-         
+             
+        print("\nALL VALUES CONVERGED!\n")    
         print("\n- TOTAL ITERATIONS: {}".format(total_iterations))
         #We save the final dataset if a path is given
         final_dataset = pd.concat((self.__features, self.__target_variable), axis=1)
