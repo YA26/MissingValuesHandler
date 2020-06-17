@@ -1,4 +1,4 @@
-from MissingValuesHandler.missing_data_handler import MissingDataHandler
+from missing_data_handler import MissingDataHandler
 from sklearn.ensemble import RandomForestClassifier
 from os.path import join
 from pandas import read_csv
@@ -45,3 +45,6 @@ final_proximity_matrix              = missing_data_handler.get_proximity_matrix(
 final_distance_matrix               = missing_data_handler.get_distance_matrix()
 weighted_averages                   = missing_data_handler.get_all_weighted_averages()
 converged_values                    = missing_data_handler.get_converged_values()
+
+
+

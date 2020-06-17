@@ -7,11 +7,9 @@ Created on Mon Nov  4 18:46:50 2019
 from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
 from sklearn.preprocessing import LabelEncoder
-from joblib import Parallel, delayed
 from collections import defaultdict
 from colorama import Back, Style
 from copy import copy
-import multiprocessing
 import pandas as pd
 import numpy as np
 
@@ -58,9 +56,6 @@ class MissingDataHandler(object):
     def __init__(self):   
         #Data type identifier variables
         self.__data_type_identifier_object      = DataTypeIdentifier()
-      
-        #Parallelization variable 
-        self.__parallel                         = Parallel(n_jobs=multiprocessing.cpu_count())
         
         #Main variables
         self.__original_data                    = None 
@@ -383,23 +378,19 @@ class MissingDataHandler(object):
             self.__estimator                = precedent_estimator
             print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
    
-         
-    @staticmethod   
-    def __build_proximity_matrix(estimator, encoded_features):
+          
+    def __build_proximity_matrix(self, predictions):
         '''
-            Builds a scaled proximity matrix.
+            Builds a proximity matrices.
             1- We run all the data down the first tree and output predictions.
             2- If two samples fall in the same node (same predictions) we count it as 1.
             3- We do the same for every single tree, sum up the proximity matrices and divide the total by the number of estimators.
         '''
-        proximity_matrix = np.zeros((len(encoded_features), len(encoded_features)))
-        predictions = estimator.predict(encoded_features)
-        for row, column in np.ndindex(proximity_matrix.shape):
-            #row and column each represents a specific observation.
-            #Example: observation number 7 equals row 7 and observation number 5 equals column 5.
-            #So at position (7, 5), we will have a number giving an information about how close those two observations are.
-            if predictions[row]==predictions[column]:
-                proximity_matrix[row, column]=1     
+        proximity_matrix = np.zeros((len(predictions), len(predictions)))
+        for sample, value in enumerate(predictions):
+            prediction_checklist = np.isin(predictions, value)
+            indices_checklist = np.where(prediction_checklist)[0]
+            proximity_matrix[sample, indices_checklist]=1      
         return proximity_matrix
    
             
@@ -593,7 +584,8 @@ class MissingDataHandler(object):
                 print("\n{} {} estimators have been counted {}\nEach estimator is being used for predictions...".format(Back.GREEN, self.__estimator.n_estimators, Style.RESET_ALL))
                 all_estimators_list     = self.__estimator.estimators_
                 number_of_estimators    = self.__estimator.n_estimators
-                proximity_matrices      = self.__parallel(delayed(self.__build_proximity_matrix)(estimator, self.__encoded_features) for estimator in all_estimators_list)
+                predictions             = list(map(lambda estimator: estimator.predict(self.__encoded_features), all_estimators_list))             
+                proximity_matrices      = list(map(self.__build_proximity_matrix, predictions))
                 sum_proximity_matrices  = sum(proximity_matrices)
                 self.__proximity_matrix = sum_proximity_matrices/number_of_estimators
                 print("\nPROXIMITY MATRIX BUILT!\n")
