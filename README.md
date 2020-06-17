@@ -24,7 +24,7 @@ If you want to know more about how that implementation was done, you can read th
      - **n_iterations_for_convergence:** checks after n rounds if the predicted values converged. 4 or 5 rounds are usually enough
 
 ## Coding example:
-#DecisionTreeClassifier
+# Classification case with a RandomForestClassifier
 ```python
 from MissingValuesHandler.missing_data_handler import MissingDataHandler
 from sklearn.ensemble import RandomForestClassifier
@@ -76,7 +76,10 @@ converged_values                    = missing_data_handler.get_converged_values(
 diverged_values                     = missing_data_handler.get_diverged_values()
 ```
 
-#DecisionTreeRegressor
+
+
+
+# Regression case with a RandomForestRegressor
 ```python
 from MissingValuesHandler.missing_data_handler import MissingDataHandler
 from sklearn.ensemble import RandomForestRegressor
