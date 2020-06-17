@@ -322,11 +322,13 @@ class MissingDataHandler(object):
             
             #We gather everything: numericals variables and encoded categorical ones(both ordinal and nominal)
             self.__encoded_features = pd.concat((numerical_variables, encoded_ordinal_categorical_variables, encoded_nominal_categorical_variables), axis=1)      
-        else:
+        elif categorical_variables_names:
             a_c = [column_name for column_name in categorical_variables.columns if column_name not in self.__forbidden_variables_list] 
             encoded_categorical_variables = pd.get_dummies(categorical_variables, columns=a_c)
-            #We gather everything: this time only the numerical variables and all the nominal categorical variables
+            #We gather everything: this time only the numerical variables and all nominal categorical variables
             self.__encoded_features = pd.concat((numerical_variables, encoded_categorical_variables), axis=1)
+        else:
+            self.__encoded_features = self.__features
      
         
     def __encode_target_variable(self):
@@ -398,7 +400,11 @@ class MissingDataHandler(object):
     
         while not prediction_dataframe.empty:
             randomly_chosen_index   = np.random.choice(prediction_dataframe.index.values.tolist(), 1, replace=False)
-            predicted_value         = int(prediction_dataframe.loc[randomly_chosen_index, 0])
+            predicted_value = None
+            if self.__target_variable_type_prediction.values[0, 0] == "categorical":
+                predicted_value = int(prediction_dataframe.loc[randomly_chosen_index].values[0, 0])
+            else:
+                predicted_value = prediction_dataframe.loc[randomly_chosen_index].values[0, 0]
             prediction_checklist    = prediction_dataframe[0]==predicted_value
             indices_checklist       = prediction_dataframe.index[prediction_checklist].tolist() 
             indices_checklist       = np.array(indices_checklist)
