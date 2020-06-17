@@ -3,13 +3,21 @@ from distutils.core import setup
 setup(
   name = 'MissingValuesHandler',         # How you named your package folder (MyLib)
   packages = ['MissingValuesHandler'],   # Chose the same as "name"
+<<<<<<< HEAD
   version = '1.3',      # Start with a small number and increase it with every change you make
+=======
+  version = '1.2',      # Start with a small number and increase it with every change you make
+>>>>>>> e94069502c2fdab3228fdfa8bf8771e1cd01315d
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'Missing value automatic replacement',   # Give a short description about your library
   author = 'AVOKANDOTO',                   # Type in your name
   author_email = 'yannavok2@gmail.com',      # Type in your E-Mail
   url = 'https://github.com/YA26/Missing_values_handler',   # Provide either the link to your github or to your website
+<<<<<<< HEAD
   download_url = 'https://github.com/YA26/Missing_values_handler/archive/v_13.tar.gz',    # I explain this later on
+=======
+  download_url = 'https://github.com/YA26/Missing_values_handler/archive/v_12.tar.gz',    # I explain this later on
+>>>>>>> e94069502c2fdab3228fdfa8bf8771e1cd01315d
   keywords = ['MissingValue', 'nan', 'RandomForest'],   # Keywords that define your package best
   install_requires=[            # I get to this in a second
           'scikit-learn',
