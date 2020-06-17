@@ -14,7 +14,7 @@ If you want to know more about how that implementation was done, you can read th
 
 - Choose what type of random forest you want to apply(regressor or classifier)
 
-- Set up the parameters of the random forest. The main difference resides in the criterion: it is **gini** or **entropy** for a random forest classifier and **mse** (mean square error) for a regressor.
+- Set up the parameters of the random forest. The main difference resides in the criterion: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor.
 
 - Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
 
