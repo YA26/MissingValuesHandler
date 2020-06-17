@@ -7,11 +7,12 @@ Created on Mon Nov  4 18:46:50 2019
 from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
 from sklearn.preprocessing import LabelEncoder
-from collections import defaultdict
+from collections import defaultdict, deque
 from colorama import Back, Style
 from copy import copy
 import pandas as pd
 import numpy as np
+
 
 class MissingDataHandler(object):
     '''
@@ -37,7 +38,7 @@ class MissingDataHandler(object):
     4- We build our model, fit it and evaluate it (we keep the model having the best out of bag score). We then use it to build the proximity matrix:
         - private method: __build_ensemble_model
         - private method: __fit_and_evaluate_ensemble_model
-        - private method (utility): __build_proximity_matrix
+        - public method : build_proximity_matrices
     
     5- We use the proximity matrix to compute weighted averages for all missing values(both in categorical and numerical variables):
         - private method: __compute_weighted_averages
@@ -78,7 +79,8 @@ class MissingDataHandler(object):
         self.__all_weighted_averages            = defaultdict(list)
         self.__all_weighted_averages_copy       = defaultdict(list)
         self.__has_converged                    = False
-               
+        self.__nan_values_remaining_comparator  = deque(maxlen=2)
+
         #Random forest variables
         self.__estimator                        = None
         self.__n_estimators                     = None
@@ -194,6 +196,11 @@ class MissingDataHandler(object):
         '''
         return self.__converged_values
     
+    def get_diverged_values(self):
+        '''
+        Retrieves values that were not able to converge
+        '''
+        return self.__all_weighted_averages
     
     def __check_variables_name_validity(self):
         '''
@@ -379,7 +386,7 @@ class MissingDataHandler(object):
             print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
    
      
-    def __build_proximity_matrix(self, predictions):
+    def __build_proximity_matrices(self, predictions):
         '''
             Builds proximity matrices.
             1- We run all the data down the first tree and output predictions.
@@ -399,8 +406,21 @@ class MissingDataHandler(object):
             proximity_matrix[indices_checklist[:, None], indices_checklist]=1
             prediction_dataframe.drop(indices_checklist, axis=0, inplace=True)
         return proximity_matrix
-
-            
+    
+    
+    def build_proximity_matrix(self, ensemble_estimator, encoded_features):
+        '''
+        Builds final proximity matrix: sum of all proximity matrices
+        '''
+        all_estimators_list     = ensemble_estimator.estimators_
+        number_of_estimators    = ensemble_estimator.n_estimators
+        predictions             = list(map(lambda estimator: estimator.predict(encoded_features), all_estimators_list))             
+        proximity_matrices      = list(map(self.__build_proximity_matrices, predictions))
+        sum_proximity_matrices  = sum(proximity_matrices)
+        final_proximity_matrix  = sum_proximity_matrices/number_of_estimators
+        return final_proximity_matrix
+    
+    
     def __compute_weighted_averages(self, numerical_features_decimals):
         '''
         Computes weights for every single missing value.
@@ -501,8 +521,15 @@ class MissingDataHandler(object):
                      self.__standard_deviations[missing_value_coordinates] = 0 
                 else:
                     self.__standard_deviations[missing_value_coordinates] = 1
+                    
+                    
+    def __fill_with_nan(self):
+        '''
+        Replaces every value that didn't converge(after multiple tries) with nan
+        '''
+        for coordinates in self.__all_weighted_averages.keys():
+           self.__features.loc[coordinates] = np.nan
  
-                             
     def __check_for_convergence(self):
         '''
         Checks if a given value has converged. If that's the case, the value is removed from the list 'self.__missing_values_coordinates'
@@ -529,11 +556,18 @@ class MissingDataHandler(object):
         nan_values_remaining    = len(self.__missing_values_coordinates)
         nan_values_converged    = total_nan_values - nan_values_remaining
         print("{}- {} VALUE(S) CONVERGED!\n- {} VALUE(S) REMAINING!{}".format(Back.GREEN, nan_values_converged, nan_values_remaining, Style.RESET_ALL))
-                           
-        #Setting 'has_converged' flag to True if all values converged.
-        if not self.__missing_values_coordinates:
+        
+        #checking if there are still values that didn't converge: If that's the case we stop training and replaces them with the median/mode of the distribution they belong to
+        self.__nan_values_remaining_comparator.append(nan_values_remaining)
+        if len(set(self.__nan_values_remaining_comparator))==1 and len(self.__nan_values_remaining_comparator)==2:   
+            self.__has_converged = True   
+            self.__fill_with_nan()
+            self.__make_initial_guesses()
+            print("\n-{}/{} VALUES UNABLE TO CONVERGE. THE MEDIAN AND/OR THE MODE HAVE BEEN USED AS A REPLACEMENT.\n".format(nan_values_remaining, total_nan_values))              
+        elif not self.__missing_values_coordinates:
             self.__has_converged = True
-        else:
+            print("\nALL VALUES CONVERGED!\n") 
+        else:       
             print("\n-NOT EVERY VALUE CONVERGED. ONTO THE NEXT ROUND OF ITERATIONS...\n")
 
                                                    
@@ -541,7 +575,7 @@ class MissingDataHandler(object):
         if path_to_save_dataset is not None:
             final_dataset.to_csv(path_or_buf=path_to_save_dataset, index=False)
             print("\n- NEW DATASET SAVED in: {}".format(path_to_save_dataset))
- 
+
            
     def train(self, 
               data, 
@@ -589,12 +623,7 @@ class MissingDataHandler(object):
                 
                 print("\n3- BUILDING PROXIMITY MATRIX...")  
                 print("\n{} {} estimators have been counted {}\nEach estimator is being used for predictions...".format(Back.GREEN, self.__estimator.n_estimators, Style.RESET_ALL))
-                all_estimators_list     = self.__estimator.estimators_
-                number_of_estimators    = self.__estimator.n_estimators
-                predictions             = list(map(lambda estimator: estimator.predict(self.__encoded_features), all_estimators_list))             
-                proximity_matrices      = list(map(self.__build_proximity_matrix, predictions))
-                sum_proximity_matrices  = sum(proximity_matrices)
-                self.__proximity_matrix = sum_proximity_matrices/number_of_estimators
+                self.__proximity_matrix = self.build_proximity_matrix(self.__estimator, self.__encoded_features)
                 print("\nPROXIMITY MATRIX BUILT!\n")
                       
                 print("\n4- COMPUTING WEIGHT AVERAGES...")
@@ -608,8 +637,7 @@ class MissingDataHandler(object):
             print("\n\n##################### CHECKING FOR CONVERGENCE...#####################\n\n")
             self.__compute_standard_deviations(n_iterations_for_convergence)
             self.__check_for_convergence()
-             
-        print("\nALL VALUES CONVERGED!\n")    
+                
         print("\n- TOTAL ITERATIONS: {}".format(total_iterations))
         #We save the final dataset if a path is given
         final_dataset = pd.concat((self.__features, self.__target_variable), axis=1)
