@@ -26,6 +26,7 @@ If you want to know more about how that implementation was done, you can read th
 ## Coding example:
 ### Classification case with a RandomForestClassifier
 ```python
+
 from MissingValuesHandler.missing_data_handler import MissingDataHandler
 from sklearn.ensemble import RandomForestClassifier
 from os.path import join
@@ -44,17 +45,17 @@ missing_data_handler = MissingDataHandler()
 ############### RUN TIME ###################
 ############################################
 """
-data = read_csv(join("data","test_dataset.csv"), sep=",", index_col=False)
+data = read_csv(join("data","Loan_approval.csv"), sep=",", index_col=False)
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
 missing_data_handler.set_ensemble_model_parameters(n_estimators=30, additional_estimators=5)
 
 #Launching training and getting our new dataset
 new_data = missing_data_handler.train(data=data, 
                                       base_estimator=RandomForestClassifier,
-                                      target_variable_name="Status",  
+                                      target_variable_name="Loan_Status",  
                                       n_iterations_for_convergence=4,
-                                      path_to_save_dataset=join("data", "test_dataset_no_nan.csv"),
-                                      forbidden_variables_list=[])
+                                      path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"),
+                                      forbidden_variables_list=["Credit_History"])
 
 
 """
