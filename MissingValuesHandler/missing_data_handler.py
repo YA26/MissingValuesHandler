@@ -80,7 +80,7 @@ class MissingDataHandler(object):
         self.__all_weighted_averages_copy       = defaultdict(list)
         self.__has_converged                    = False
         self.__nan_values_remaining_comparator  = deque(maxlen=2)
-
+    
         #Random forest variables
         self.__estimator                        = None
         self.__n_estimators                     = None
@@ -202,6 +202,7 @@ class MissingDataHandler(object):
         '''
         return self.__all_weighted_averages
     
+
     def __check_variables_name_validity(self):
         '''
         1- Verifies whether variables in 'forbidden_variables_list' or 'ordinal_variables_list' exist in the dataset. 
@@ -211,17 +212,17 @@ class MissingDataHandler(object):
         #1
         for variable_name in self.__forbidden_variables_list:
             if variable_name not in columns_names_list:
-                raise VariableNameError("Variable '{}' in forbidden_variables_list is not present in the dataset!".format(variable_name))
+                raise VariableNameError(f"Variable '{variable_name}' in forbidden_variables_list is not present in the dataset!")
                 
         for variable_name in self.__ordinal_variables_list:
             if variable_name not in columns_names_list:
-                raise VariableNameError("Variable '{}' in ordinal_variables_list is not present in the dataset!".format(variable_name))
+                raise VariableNameError(f"Variable '{variable_name}' in ordinal_variables_list is not present in the dataset!")
         #2               
         if True in np.in1d(self.__ordinal_variables_list, self.__forbidden_variables_list):
             duplicated_variables_checklist  = np.in1d(self.__ordinal_variables_list, self.__forbidden_variables_list)
             duplicated_variables_names      = np.where(duplicated_variables_checklist==True)[0]
             ordinal_variables_list          = np.array(self.__ordinal_variables_list)
-            raise VariableNameError("Variable(s) '{}' in ordinal_variables_list can't be duplicated in forbidden_variables_list".format(ordinal_variables_list[duplicated_variables_names]))
+            raise VariableNameError(f"Variable(s) '{ordinal_variables_list[duplicated_variables_names]}' in ordinal_variables_list can't be duplicated in forbidden_variables_list")
      
                   
     def __separate_features_and_target_variable(self, target_variable_name):
@@ -231,14 +232,14 @@ class MissingDataHandler(object):
             self.__target_variable_name = target_variable_name
         except KeyError:
             #We raise an exception if the name of the target variable given by the user is not found.
-            raise TargetVariableNameError("Target variable '{}' does not exist!".format(target_variable_name))
+            raise TargetVariableNameError(f"Target variable '{target_variable_name}' does not exist!")
      
         
     def __predict_feature_type(self):
         '''
         Predicts if a feature is either categorical or numerical.
         '''
-        self.__features_type_predictions = self.__data_type_identifier_object.predict(self.__features)
+        self.__features_type_predictions = self.__data_type_identifier_object.predict(self.__features, self.__print_verbose)
      
         
     def __predict_target_variable_type(self):
@@ -246,7 +247,7 @@ class MissingDataHandler(object):
         Predicts if the target variable is either categorical or numerical.
         '''
         target_variable                        = self.__target_variable.to_frame()
-        self.__target_variable_type_prediction = self.__data_type_identifier_object.predict(target_variable) 
+        self.__target_variable_type_prediction = self.__data_type_identifier_object.predict(target_variable, self.__print_verbose) 
 
 
     def __retrieve_nan_coordinates(self):
@@ -337,13 +338,13 @@ class MissingDataHandler(object):
         If the target variable is numerical it will not be encoded so there's no need to put it in 'forbidden_variables_list'.
         The target variable will always be label encoded because the trees in the random forest aren't using it for splitting purposes.
         '''
+        #We keep the target variable unchanged if the user requires it or if it is numerical
+        self.__target_variable_encoded  = self.__target_variable
+        #We encode it if the variable is categorical
         if self.__target_variable_name not in self.__forbidden_variables_list and self.__target_variable_type_prediction["Predictions"].any()=="categorical":
             self.__target_variable_encoded  = self.__label_encoder.fit_transform(self.__target_variable)
-        else:
-            #We keep the target variable unchanged if the user requires it or if it is numerical
-            self.__target_variable_encoded  = self.__target_variable                 
-
-
+     
+            
     def __build_ensemble_model(self, base_estimator):
             '''Builds an ensemble model: random forest classifier or regressor'''
             self.__estimator = base_estimator(n_estimators=self.__n_estimators, 
@@ -377,15 +378,15 @@ class MissingDataHandler(object):
             while current_out_of_bag_score > precedent_out_of_bag_score or current_out_of_bag_score==0:
                 precedent_estimator = copy(self.__estimator)
                 self.__estimator.fit(self.__encoded_features, self.__target_variable_encoded) 
-                precedent_out_of_bag_score     = current_out_of_bag_score
-                current_out_of_bag_score       = self.__estimator.oob_score_
-                self.__estimator.n_estimators  += self.__additional_estimators
-                print("- Former out of bag score: {0:f}".format(precedent_out_of_bag_score))
-                print("- Current out of bag score: {0:f} ".format(current_out_of_bag_score) + "/ {0:+f}".format(current_out_of_bag_score-precedent_out_of_bag_score))
+                precedent_out_of_bag_score      = current_out_of_bag_score
+                current_out_of_bag_score        = self.__estimator.oob_score_
+                self.__estimator.n_estimators   += self.__additional_estimators
+                self.__print("- Former out of bag score: {0:f}".format(precedent_out_of_bag_score))
+                self.__print("- Current out of bag score: {0:f} ".format(current_out_of_bag_score)+" /{0:+f}".format(current_out_of_bag_score-precedent_out_of_bag_score))
             #We subtract the additional_estimators because we want to keep the configuration of the previous model(i.e the optimal one)
             self.__estimator.n_estimators   -= self.__additional_estimators
             self.__estimator                = precedent_estimator
-            print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
+            self.__print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
    
      
     def __build_proximity_matrices(self, predictions):
@@ -399,12 +400,10 @@ class MissingDataHandler(object):
         prediction_dataframe = pd.DataFrame(predictions)
     
         while not prediction_dataframe.empty:
-            randomly_chosen_index   = np.random.choice(prediction_dataframe.index.values.tolist(), 1, replace=False)
-            predicted_value = None
+            randomly_chosen_index = np.random.choice(prediction_dataframe.index.values.tolist(), 1, replace=False)
+            predicted_value       = prediction_dataframe.loc[randomly_chosen_index].values[0, 0]
             if self.__target_variable_type_prediction.values[0, 0] == "categorical":
                 predicted_value = int(prediction_dataframe.loc[randomly_chosen_index].values[0, 0])
-            else:
-                predicted_value = prediction_dataframe.loc[randomly_chosen_index].values[0, 0]
             prediction_checklist    = prediction_dataframe[0]==predicted_value
             indices_checklist       = prediction_dataframe.index[prediction_checklist].tolist() 
             indices_checklist       = np.array(indices_checklist)
@@ -514,21 +513,15 @@ class MissingDataHandler(object):
     def __compute_standard_deviations(self, n_iterations_for_convergence):
         '''
         Computes the standard deviation of the last n substitutes
+        For numerical values, the standard deviation can be computed, we can delete coordinates with values with 0<std<1.
+        For non numerical variables, computing the standard deviation doesn't make same from a statistical point of view,
+        but we can use it here to assert that it has to be equal to 0 if the value converges.
         '''
         for missing_value_coordinates, substitute in self.__all_weighted_averages.items():
             last_n_substitutes = substitute[-n_iterations_for_convergence:]
-            try:
-                #Standard deviation for last n numerical values for every nan
-                self.__standard_deviations[missing_value_coordinates] = np.std(last_n_substitutes)
-            except TypeError:
-                #Checking whether our last n substitutes are the same (0) or not (1).
-                #We can't compute standard deviation for non numerical variables. So this is a good alternative.
-                if len(set(last_n_substitutes))==1:
-                     self.__standard_deviations[missing_value_coordinates] = 0 
-                else:
-                    self.__standard_deviations[missing_value_coordinates] = 1
-                    
-                    
+            self.__standard_deviations[missing_value_coordinates] = np.std(last_n_substitutes)
+     
+
     def __fill_with_nan(self):
         '''
         Replaces every value that didn't converge(after multiple tries) with nan
@@ -536,23 +529,23 @@ class MissingDataHandler(object):
         for coordinates in self.__all_weighted_averages.keys():
            self.__features.loc[coordinates] = np.nan
  
+
     def __check_for_convergence(self):
         '''
         Checks if a given value has converged. If that's the case, the value is removed from the list 'self.__missing_values_coordinates'
         '''
-        missing_value_coordinates = list(self.__standard_deviations.keys()) 
-        
+        missing_value_coordinates = list(self.__standard_deviations.keys())         
         for coordinates in missing_value_coordinates:
             nan_feature_name = coordinates[1]
             standard_deviation = self.__standard_deviations[coordinates]
-            if (self.__features_type_predictions.loc[nan_feature_name].any()=="numerical" and standard_deviation>=0 and standard_deviation<1)\
+            if (self.__features_type_predictions.loc[nan_feature_name].any()=="numerical" and 0<=standard_deviation<1)\
             or (self.__features_type_predictions.loc[nan_feature_name].any()=="categorical" and standard_deviation==0):
-                #If a numerical or a categorical missing value converges, we keep their most recent value.
+                #If a numerical or a categorical missing value converges, we keep the last value.
                 converged_value                                 = self.__all_weighted_averages[coordinates][-1] 
                 self.__converged_values[coordinates]            = converged_value
                 #We do not forget to make a copy of the nan coordinates (row, column) and their values over time(for the user).
                 self.__all_weighted_averages_copy[coordinates]  = self.__all_weighted_averages[coordinates]
-                #Removing nan values that converged
+                #Removing nan values that convergedd               
                 self.__missing_values_coordinates.remove(coordinates)
                 self.__all_weighted_averages.pop(coordinates)
                 self.__standard_deviations.pop(coordinates)
@@ -561,7 +554,7 @@ class MissingDataHandler(object):
         total_nan_values        = self.__number_of_nan_values
         nan_values_remaining    = len(self.__missing_values_coordinates)
         nan_values_converged    = total_nan_values - nan_values_remaining
-        print("{}- {} VALUE(S) CONVERGED!\n- {} VALUE(S) REMAINING!{}".format(Back.GREEN, nan_values_converged, nan_values_remaining, Style.RESET_ALL))
+        self.__print(f"{Back.GREEN}- {nan_values_converged} VALUE(S) CONVERGED!\n- {nan_values_remaining} VALUE(S) REMAINING!{Style.RESET_ALL}")
         
         #checking if there are still values that didn't converge: If that's the case we stop training and replaces them with the median/mode of the distribution they belong to
         self.__nan_values_remaining_comparator.append(nan_values_remaining)
@@ -569,20 +562,24 @@ class MissingDataHandler(object):
             self.__has_converged = True   
             self.__fill_with_nan()
             self.__make_initial_guesses()
-            print("\n-{}/{} VALUES UNABLE TO CONVERGE. THE MEDIAN AND/OR THE MODE HAVE BEEN USED AS A REPLACEMENT.\n".format(nan_values_remaining, total_nan_values))              
+            self.__print(f"\n-{nan_values_remaining}/{total_nan_values} VALUES UNABLE TO CONVERGE. THE MEDIAN AND/OR THE MODE HAVE BEEN USED AS A REPLACEMENT.\n")              
         elif not self.__missing_values_coordinates:
             self.__has_converged = True
-            print("\nALL VALUES CONVERGED!\n") 
+            self.__print("\nALL VALUES CONVERGED!\n") 
         else:       
-            print("\n-NOT EVERY VALUE CONVERGED. ONTO THE NEXT ROUND OF ITERATIONS...\n")
+            self.__print("\n-NOT EVERY VALUE CONVERGED. ONTO THE NEXT ROUND OF ITERATIONS...\n")
 
-                                                   
+                                                  
     def __save_new_dataset(self, final_dataset, path_to_save_dataset):
         if path_to_save_dataset is not None:
             final_dataset.to_csv(path_or_buf=path_to_save_dataset, index=False)
-            print("\n- NEW DATASET SAVED in: {}".format(path_to_save_dataset))
+            self.__print(f"\n- NEW DATASET SAVED in: {path_to_save_dataset}")
 
-           
+
+    def __print(self, string):
+        if self.__print_verbose:
+            print(string)
+   
     def train(self, 
               data, 
               base_estimator,
@@ -590,6 +587,7 @@ class MissingDataHandler(object):
               n_iterations_for_convergence=4,
               numerical_features_decimals=0, 
               path_to_save_dataset=None,
+              verbose=1,
               forbidden_variables_list=[],
               ordinal_variables_list=[]):
         '''
@@ -599,10 +597,11 @@ class MissingDataHandler(object):
         self.__ordinal_variables_list   = ordinal_variables_list
         self.__forbidden_variables_list = forbidden_variables_list
         self.__has_converged            = False
+        self.__print_verbose            = verbose
         total_iterations                = 0
         
         #Initializing training
-        print("Getting ready...\nMaking initial guesses...\n")
+        self.__print("Getting ready...\nMaking initial guesses...\n")
         self.__original_data = data.copy()
         self.__check_variables_name_validity()
         self.__separate_features_and_target_variable(target_variable_name)  
@@ -617,36 +616,36 @@ class MissingDataHandler(object):
             for iteration in range(1, n_iterations_for_convergence + 1):
                 total_iterations += 1 
                 self.__encode_features()
-                print("\n##################### ROUND :{} / TOTAL ROUNDS: {} #####################\n".format(iteration, total_iterations))
+                self.__print(f"\n##################### ROUND :{iteration} / TOTAL ROUNDS: {total_iterations} #####################\n")
                 
-                print("\n1- MODEL BULDING...\n")
+                self.__print("\n1- MODEL BULDING...\n")
                 self.__build_ensemble_model(base_estimator)
-                print("\nMODEL BUILT!\n")
+                self.__print("\nMODEL BUILT!\n")
                 
-                print("\n2- FITTING AND EVALUATING THE MODEL...\n")
+                self.__print("\n2- FITTING AND EVALUATING THE MODEL...\n")
                 self.__fit_and_evaluate_ensemble_model()
-                print("MODEL FITTED AND EVALUATED!")
+                self.__print("MODEL FITTED AND EVALUATED!")
                 
-                print("\n3- BUILDING PROXIMITY MATRIX...")  
-                print("\n{} {} estimators have been counted {}\nEach estimator is being used for predictions...".format(Back.GREEN, self.__estimator.n_estimators, Style.RESET_ALL))
+                self.__print("\n3- BUILDING PROXIMITY MATRIX...")  
+                self.__print(f"\n{Back.GREEN} {self.__estimator.n_estimators} estimators have been counted {Style.RESET_ALL}\nEach estimator is being used for predictions...")
                 self.__proximity_matrix = self.build_proximity_matrix(self.__estimator, self.__encoded_features)
-                print("\nPROXIMITY MATRIX BUILT!\n")
+                self.__print("\nPROXIMITY MATRIX BUILT!\n")
                       
-                print("\n4- COMPUTING WEIGHT AVERAGES...")
+                self.__print("\n4- COMPUTING WEIGHT AVERAGES...")
                 self.__compute_weighted_averages(numerical_features_decimals)
-                print("\nWEIGHT AVERAGES COMPUTED!\n")
+                self.__print("\nWEIGHT AVERAGES COMPUTED!\n")
                         
-                print("\n5- REPLACING NAN VALUES IN ENCODED DATA...")           
+                self.__print("\n5- REPLACING NAN VALUES IN ENCODED DATA...")           
                 self.__replace_missing_values_in_dataframe()
-                print("\nNAN VALUES REPLACED!\n")
+                self.__print("\nNAN VALUES REPLACED!\n")
                 
-            print("\n\n##################### CHECKING FOR CONVERGENCE...#####################\n\n")
+            self.__print("\n\n##################### CHECKING FOR CONVERGENCE...#####################\n\n")
             self.__compute_standard_deviations(n_iterations_for_convergence)
             self.__check_for_convergence()
                 
-        print("\n- TOTAL ITERATIONS: {}".format(total_iterations))
+        self.__print(f"\n- TOTAL ITERATIONS: {total_iterations}")
         #We save the final dataset if a path is given
         final_dataset = pd.concat((self.__features, self.__target_variable), axis=1)
-        self.__save_new_dataset(final_dataset, path_to_save_dataset)
+        self.__save_new_dataset(final_dataset, path_to_save_dataset)  
         return  final_dataset 
     

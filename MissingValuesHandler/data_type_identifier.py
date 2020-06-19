@@ -4,17 +4,23 @@ from sklearn.preprocessing import scale
 from inspect import getsourcefile
 from os.path import join, dirname
 from numpy import sort, array
+import sys
 import pandas as pd
 import pickle
 
 class DataTypeIdentifier(object):
         
     def __init__(self):
-        self.__encoder  = LabelEncoder()
+        self.__encoder          = LabelEncoder()
+        self.__print_verbose    = None
                      
     def get_encoder(self):
         return self.__encoder
-        
+
+    def __print(self, string):
+        if self.__print_verbose:
+            print(string) 
+    
     def __keep_initial_data_types(self, original_data):
         '''
         This function helps us render immuable the data type of every feature(column) that was set before the data was imported.
@@ -24,7 +30,7 @@ class DataTypeIdentifier(object):
         data = original_data.copy()
         for column in data.columns:
             try:    
-                print("- Feature *{}* treated".format(column))
+                self.__print(f"- Feature *{column}* treated")
                 data=data.astype({column: pd.Int64Dtype()})
             except TypeError:
                 pass     
@@ -101,11 +107,11 @@ class DataTypeIdentifier(object):
             loaded_variable = pickle.load(file)
         return loaded_variable
     
-    def predict(self, original_data):
+    def predict(self, original_data, verbose=1):
         '''
         We finally get our predictions by doing some data preprocessing first(counting unique values and checking if a feature has the data type float).
         '''
-
+        self.__print_verbose    = verbose
         # 1- We keep the initial data types
         accurately_typed_data   = self.__keep_initial_data_types(original_data)
         # 2- We build our final_set for our model.
