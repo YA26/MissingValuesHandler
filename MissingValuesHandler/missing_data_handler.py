@@ -5,13 +5,16 @@ Created on Mon Nov  4 18:46:50 2019
 @author: Yann Avok
 """
 from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
 from sklearn.preprocessing import LabelEncoder
-from collections import defaultdict, deque
+from collections import defaultdict, deque, Counter
 from colorama import Back, Style
 from copy import copy
+import matplotlib.pyplot as plt 
 import pandas as pd
 import numpy as np
+import os
 
 
 class MissingDataHandler(object):
@@ -85,7 +88,6 @@ class MissingDataHandler(object):
         self.__estimator                        = None
         self.__n_estimators                     = None
         self.__additional_estimators            = None
-        self.__criterion                        = None
         self.__max_depth                        = None
         self.__min_samples_split                = None 
         self.__min_samples_leaf                 = None
@@ -105,7 +107,6 @@ class MissingDataHandler(object):
     def set_ensemble_model_parameters(self,
                                       additional_estimators=20,
                                       n_estimators=30,
-                                      criterion='gini',
                                       max_depth=None,
                                       min_samples_split=20, 
                                       min_samples_leaf=20,
@@ -122,7 +123,6 @@ class MissingDataHandler(object):
         ''' 
         self.__additional_estimators            = additional_estimators
         self.__n_estimators                     = n_estimators
-        self.__criterion                        = criterion
         self.__max_depth                        = max_depth
         self.__min_samples_split                = min_samples_split 
         self.__min_samples_leaf                 = min_samples_leaf
@@ -190,13 +190,13 @@ class MissingDataHandler(object):
         return self.__all_weighted_averages_copy
     
     
-    def get_converged_values(self):
+    def get_convergent_values(self):
         '''
         Retrieves all nan values and their last calculated values.
         '''
         return self.__converged_values
     
-    def get_diverged_values(self):
+    def get_divergent_values(self):
         '''
         Retrieves values that were not able to converge
         '''
@@ -345,26 +345,29 @@ class MissingDataHandler(object):
             self.__target_variable_encoded  = self.__label_encoder.fit_transform(self.__target_variable)
      
             
-    def __build_ensemble_model(self, base_estimator):
+    def __build_ensemble_model(self):
             '''Builds an ensemble model: random forest classifier or regressor'''
-            self.__estimator = base_estimator(n_estimators=self.__n_estimators, 
-                                              criterion=self.__criterion, 
-                                              max_depth=self.__max_depth, 
-                                              min_samples_split=self.__min_samples_split, 
-                                              min_samples_leaf=self.__min_samples_leaf, 
-                                              min_weight_fraction_leaf=self.__min_weight_fraction_leaf, 
-                                              max_features=self.__max_features, 
-                                              max_leaf_nodes=self.__max_leaf_nodes, 
-                                              min_impurity_decrease=self.__min_impurity_decrease, 
-                                              min_impurity_split=self.__min_impurity_split, 
-                                              bootstrap=self.__bootstrap, 
-                                              oob_score=self.__oob_score, 
-                                              n_jobs=self.__n_jobs, 
-                                              random_state=self.__random_state, 
-                                              verbose=self.__verbose,
-                                              warm_start=self.__warm_start)
-   
-                                
+
+            EnsembleModel           = {"categorical":RandomForestClassifier, "numerical":RandomForestRegressor}
+            target_variable_type    = self.__target_variable_type_prediction["Predictions"].any()
+            self.__estimator        = EnsembleModel[target_variable_type](n_estimators=self.__n_estimators,
+                                                                            max_depth=self.__max_depth, 
+                                                                            min_samples_split=self.__min_samples_split, 
+                                                                            min_samples_leaf=self.__min_samples_leaf, 
+                                                                            min_weight_fraction_leaf=self.__min_weight_fraction_leaf, 
+                                                                            max_features=self.__max_features, 
+                                                                            max_leaf_nodes=self.__max_leaf_nodes, 
+                                                                            min_impurity_decrease=self.__min_impurity_decrease, 
+                                                                            min_impurity_split=self.__min_impurity_split, 
+                                                                            bootstrap=self.__bootstrap, 
+                                                                            oob_score=self.__oob_score, 
+                                                                            n_jobs=self.__n_jobs, 
+                                                                            random_state=self.__random_state, 
+                                                                            verbose=self.__verbose,
+                                                                            warm_start=self.__warm_start)
+           
+
+
     def __fit_and_evaluate_ensemble_model(self):
             '''
             Fits and evaluates the model. 
@@ -398,12 +401,11 @@ class MissingDataHandler(object):
         ''' 
         proximity_matrix = np.zeros((len(self.__encoded_features), len(self.__encoded_features)))
         prediction_dataframe = pd.DataFrame(predictions)
-    
         while not prediction_dataframe.empty:
             randomly_chosen_index = np.random.choice(prediction_dataframe.index.values.tolist(), 1, replace=False)
-            predicted_value       = prediction_dataframe.loc[randomly_chosen_index].values[0, 0]
-            if self.__target_variable_type_prediction.values[0, 0] == "categorical":
-                predicted_value = int(prediction_dataframe.loc[randomly_chosen_index].values[0, 0])
+            predicted_value       = prediction_dataframe.loc[randomly_chosen_index].values[0,0]
+            if self.__target_variable_type_prediction.values[0,0] == "categorical":
+                predicted_value = int(prediction_dataframe.loc[randomly_chosen_index].values[0,0])
             prediction_checklist    = prediction_dataframe[0]==predicted_value
             indices_checklist       = prediction_dataframe.index[prediction_checklist].tolist() 
             indices_checklist       = np.array(indices_checklist)
@@ -588,7 +590,6 @@ class MissingDataHandler(object):
    
     def train(self, 
               data, 
-              base_estimator,
               target_variable_name,
               n_iterations_for_convergence=4,
               numerical_features_decimals=0, 
@@ -625,7 +626,7 @@ class MissingDataHandler(object):
                 self.__print(f"\n##################### ROUND :{iteration} / TOTAL ROUNDS: {total_iterations} #####################\n")
                 
                 self.__print("\n1- MODEL BULDING...\n")
-                self.__build_ensemble_model(base_estimator)
+                self.__build_ensemble_model()
                 self.__print("\nMODEL BUILT!\n")
                 
                 self.__print("\n2- FITTING AND EVALUATING THE MODEL...\n")
@@ -655,3 +656,54 @@ class MissingDataHandler(object):
         self.__save_new_dataset(final_dataset, path_to_save_dataset)  
         return  final_dataset 
     
+
+    def create_weighted_averages_plots(self, directory_path, both_graphs=0, verbose=1):
+        convergent_and_divergent = []
+        convergent_and_divergent.append((self.__all_weighted_averages, "divergent_graphs"))
+        if both_graphs:
+            convergent_and_divergent.append((self.__all_weighted_averages_copy, "convergent_graphs"))
+
+        for value in convergent_and_divergent:
+            weighted_average_dict   = value[0]
+            graph_type              = value[1]
+            if (self.__all_weighted_averages or self.__all_weighted_averages_copy):
+                for coordinates, values in weighted_average_dict.items():
+                    if verbose:
+                        print(f"-{coordinates} graph created")                       
+                    try:
+                        std = str(np.round(self.__standard_deviations[coordinates],2))
+                    except KeyError:
+                        pass
+                    row_number          = coordinates[0] 
+                    variable_name       = coordinates[1]
+                    std_str             = f"std_{std}"
+                    filename            = f"row_{row_number}_column_{variable_name}" 
+                    iterations          = len(values)
+                    path                = os.path.join(directory_path, graph_type, variable_name)
+                    if not os.path.exists(path):
+                        os.makedirs(path)                     
+                    if self.__features_type_predictions.loc[variable_name].any()=="numerical":
+                        plt.ioff()
+                        plt.figure()
+                        plt.title(f"Evolution of value {coordinates} over {iterations} iterations\nstd:{std}")
+                        plt.plot(np.arange(1,iterations+1), values)
+                        plt.xlabel('Iterations')
+                        plt.ylabel('Values')
+                        plt.savefig(os.path.join(path, filename+"_"+std_str+".jpg"))
+                    else:
+                        plt.ioff()
+                        plt.figure()
+                        data        = Counter(values)
+                        names       = list(data.keys())
+                        values      = list(data.values())
+                        percentages = list(map(int, (values/np.sum(values))*100))
+                        for i in range(len(percentages)):
+                            plt.annotate(s=percentages[i], xy=(names[i], percentages[i]+1), fontsize=10)
+                            plt.hlines(percentages[i], xmin=0, xmax=0)
+                        plt.bar(names, percentages, align="center")
+                        plt.ylabel('Proportion')
+                        plt.title(f"Proportions of value {coordinates} modalities after {iterations} iterations")
+                        plt.savefig(os.path.join(path, filename+".jpg"))
+            elif not self.__all_weighted_averages:
+                print("All values have converged. No plots available")
+            
