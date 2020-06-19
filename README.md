@@ -70,5 +70,5 @@ final_distance_matrix               = missing_data_handler.get_distance_matrix()
 weighted_averages                   = missing_data_handler.get_all_weighted_averages()
 converged_values                    = missing_data_handler.get_convergent_values()
 diverged_values                     = missing_data_handler.get_divergent_values()
-#Retrieve graphs depicting the evolution of the prediction of missing values over n iterations
+#Retrieve graphs depicting the evolution of missing values estimations over n iterations
 missing_data_handler.create_weighted_averages_plots(directory_path="graphs", both_graphs=0)
