@@ -12,10 +12,9 @@ If you want to know more about how that implementation was done, you can read th
 
 - Import a dataset
 
-- Choose what type of random forest you want to apply(regressor or classifier)
+- The type of **Random Forest is automatically handled**: if the target variable is numerical, a RandomForestRegressor is selected and if it is categorical, we will choose a RandomForestClassifier
 
-- Set up the parameters of the random forest. The main difference resides in the criterion: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor.
-
+- Set up the parameters of the random forest. The main difference resides in the criterion: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor. 
 - Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
 
 - The method **train()** possesses three important arguments among others:
@@ -72,5 +71,5 @@ final_distance_matrix               = missing_data_handler.get_distance_matrix()
 weighted_averages                   = missing_data_handler.get_all_weighted_averages()
 converged_values                    = missing_data_handler.get_convergent_values()
 diverged_values                     = missing_data_handler.get_divergent_values()
-
+#Retrieve graphs depicting the evolution of the prediction of missing values over n iterations
 missing_data_handler.create_weighted_averages_plots(directory_path="graphs", both_graphs=0)
