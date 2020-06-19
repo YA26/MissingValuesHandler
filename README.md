@@ -14,9 +14,8 @@ If you want to know more about how that implementation was done, you can read th
 
 - The type of **Random Forest is automatically handled**: if the target variable is numerical, a RandomForestRegressor is selected and if it is categorical, the algorithm will choose a RandomForestClassifier
 
-- Set up the parameters of the random forest. The main difference resides in the criterion: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor. 
+- Set up the parameters of the random forest except for the **criterion** since it is also taken care of by the software: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor. 
 - Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
-
 - The method **train()** possesses three important arguments among others:
      - **forbidden_variables_list:** variables that don't require encoding will be put in that list
      - **ordinal_variables_list:** suited for ordinal categorical variables encoding
