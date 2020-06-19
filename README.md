@@ -12,7 +12,7 @@ If you want to know more about how that implementation was done, you can read th
 
 - Import a dataset
 
-- The type of **Random Forest is automatically handled**: if the target variable is numerical, a RandomForestRegressor is selected and if it is categorical, the algorithm will choose a RandomForestClassifier
+- The type of **Random Forest is automatically handled**: if the target variable is numerical, a **RandomForestRegressor** is selected and if it is categorical, the algorithm will choose a **RandomForestClassifier**.
 
 - Set up the parameters of the random forest except for the **criterion** since it is also taken care of by the software: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor. 
 - Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
