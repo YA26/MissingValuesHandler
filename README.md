@@ -8,7 +8,7 @@ If you want to know more about how that implementation was done, you can read th
 
 ## Do you want to give it a try?
 
-- You can get the library with ```pip install MissingValuesHandler```
+- You can get the library with ***```pip install MissingValuesHandler```***
 
 - Import a dataset
 
