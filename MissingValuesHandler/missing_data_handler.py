@@ -513,13 +513,19 @@ class MissingDataHandler(object):
     def __compute_standard_deviations(self, n_iterations_for_convergence):
         '''
         Computes the standard deviation of the last n substitutes
-        For numerical values, the standard deviation can be computed, we can delete coordinates with values with 0<std<1.
-        For non numerical variables, computing the standard deviation doesn't make same from a statistical point of view,
-        but we can use it here to assert that it has to be equal to 0 if the value converges.
         '''
         for missing_value_coordinates, substitute in self.__all_weighted_averages.items():
             last_n_substitutes = substitute[-n_iterations_for_convergence:]
-            self.__standard_deviations[missing_value_coordinates] = np.std(last_n_substitutes)
+            try:
+                #Standard deviation for last n numerical values for every nan
+                self.__standard_deviations[missing_value_coordinates] = np.std(last_n_substitutes)
+            except TypeError:
+                #Checking whether our last n substitutes are the same (0) or not (1).
+                #We can't compute standard deviation for non numerical variables. So this is a good alternative.
+                if len(set(last_n_substitutes))==1:
+                     self.__standard_deviations[missing_value_coordinates] = 0 
+                else:
+                    self.__standard_deviations[missing_value_coordinates] = 1
      
 
     def __fill_with_nan(self):
