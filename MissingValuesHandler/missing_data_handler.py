@@ -75,6 +75,7 @@ class MissingDataHandler(object):
         self.__number_of_nan_values             = None
         self.__forbidden_variables_list         = None
         self.__ordinal_variables_list           = None
+        self.__last_n_iterations                = None
         self.__missing_values_coordinates       = []
         self.__label_encoder                    = LabelEncoder()
         self.__standard_deviations              = defaultdict()
@@ -83,7 +84,7 @@ class MissingDataHandler(object):
         self.__all_weighted_averages_copy       = defaultdict(list)
         self.__has_converged                    = False
         self.__nan_values_remaining_comparator  = deque(maxlen=2)
-    
+        
         #Random forest variables
         self.__estimator                        = None
         self.__n_estimators                     = None
@@ -542,6 +543,7 @@ class MissingDataHandler(object):
         '''
         Checks if a given value has converged. If that's the case, the value is removed from the list 'self.__missing_values_coordinates'
         '''
+        print(self.__standard_deviations)
         missing_value_coordinates = list(self.__standard_deviations.keys())         
         for coordinates in missing_value_coordinates:
             nan_feature_name = coordinates[1]
@@ -603,6 +605,7 @@ class MissingDataHandler(object):
         #Updating some of the main variables
         self.__ordinal_variables_list   = ordinal_variables_list
         self.__forbidden_variables_list = forbidden_variables_list
+        self.__last_n_iterations        = n_iterations_for_convergence
         self.__has_converged            = False
         self.__print_verbose            = verbose
         total_iterations                = 0
@@ -666,44 +669,41 @@ class MissingDataHandler(object):
         for value in convergent_and_divergent:
             weighted_average_dict   = value[0]
             graph_type              = value[1]
-            if (self.__all_weighted_averages or self.__all_weighted_averages_copy):
-                for coordinates, values in weighted_average_dict.items():
-                    if verbose:
-                        print(f"-{coordinates} graph created")                       
-                    try:
-                        std = str(np.round(self.__standard_deviations[coordinates],2))
-                    except KeyError:
-                        pass
-                    row_number          = coordinates[0] 
-                    variable_name       = coordinates[1]
-                    std_str             = f"std_{std}"
-                    filename            = f"row_{row_number}_column_{variable_name}" 
-                    iterations          = len(values)
-                    path                = os.path.join(directory_path, graph_type, variable_name)
-                    if not os.path.exists(path):
-                        os.makedirs(path)                     
-                    if self.__features_type_predictions.loc[variable_name].any()=="numerical":
-                        plt.ioff()
-                        plt.figure()
-                        plt.title(f"Evolution of value {coordinates} over {iterations} iterations\nstd:{std}")
-                        plt.plot(np.arange(1,iterations+1), values)
-                        plt.xlabel('Iterations')
-                        plt.ylabel('Values')
-                        plt.savefig(os.path.join(path, filename+"_"+std_str+".jpg"))
-                    else:
-                        plt.ioff()
-                        plt.figure()
-                        data        = Counter(values)
-                        names       = list(data.keys())
-                        values      = list(data.values())
-                        percentages = list(map(int, (values/np.sum(values))*100))
-                        for i in range(len(percentages)):
-                            plt.annotate(s=percentages[i], xy=(names[i], percentages[i]+1), fontsize=10)
-                            plt.hlines(percentages[i], xmin=0, xmax=0)
-                        plt.bar(names, percentages, align="center")
-                        plt.ylabel('Proportion')
-                        plt.title(f"Proportions of value {coordinates} modalities after {iterations} iterations")
-                        plt.savefig(os.path.join(path, filename+".jpg"))
-            elif not self.__all_weighted_averages:
-                print("All values have converged. No plots available")
-            
+            std                     = 0
+            for coordinates, values in weighted_average_dict.items():
+                if verbose:
+                    print(f"-{coordinates} graph created")                       
+                try:
+                    std = np.round(self.__standard_deviations[coordinates],2)
+                except KeyError:
+                    pass
+                row_number          = coordinates[0] 
+                variable_name       = coordinates[1]
+                std_str             = f"std_{std}"
+                filename            = f"row_{row_number}_column_{variable_name}" 
+                iterations          = len(values)
+                path                = os.path.join(directory_path, graph_type, variable_name)
+                if not os.path.exists(path):
+                    os.makedirs(path)                     
+                if self.__features_type_predictions.loc[variable_name].any()=="numerical":
+                    plt.ioff()
+                    plt.figure()
+                    plt.title(f"Evolution of value {coordinates} over {iterations} iterations\nstd on the last {self.__last_n_iterations} iterations:{std}")
+                    plt.plot(np.arange(1,iterations+1), values)
+                    plt.xlabel('Iterations')
+                    plt.ylabel('Values')
+                    plt.savefig(os.path.join(path, filename+"_"+std_str+".jpg"))
+                else:
+                    plt.ioff()
+                    plt.figure()
+                    data        = Counter(values)
+                    names       = list(data.keys())
+                    values      = list(data.values())
+                    percentages = list(map(int, (values/np.sum(values))*100))
+                    for i in range(len(percentages)):
+                        plt.annotate(s=percentages[i], xy=(names[i], percentages[i]+1), fontsize=10)
+                        plt.hlines(percentages[i], xmin=0, xmax=0)
+                    plt.bar(names, percentages, align="center")
+                    plt.ylabel('Proportion')
+                    plt.title(f"Proportions of value {coordinates} modalities after {iterations} iterations")
+                    plt.savefig(os.path.join(path, filename+".jpg"))

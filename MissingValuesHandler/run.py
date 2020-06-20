@@ -15,17 +15,17 @@ missing_data_handler = MissingDataHandler()
 ############### RUN TIME ###################
 ###################################--#########
 """
-data = read_csv(join("data","scoring.csv"), sep=",", index_col=False)
+data = read_csv(join("data","Loan_approval.csv"), sep=",", index_col=False)
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
 missing_data_handler.set_ensemble_model_parameters(n_estimators=30, additional_estimators=10)
 
 #Launching training and getting our new dataset
 new_data = missing_data_handler.train(data=data, 
-                                      target_variable_name="Status",  
-                                      n_iterations_for_convergence=4,
+                                      target_variable_name="Loan_Status",  
+                                      n_iterations_for_convergence=5,
                                       verbose=1,
-                                      path_to_save_dataset=join("data", "scoring_no_nan.csv"),
-                                      forbidden_variables_list=[])
+                                      path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"),
+                                      forbidden_variables_list=["Credit_History"])
 
 
 """
@@ -47,5 +47,5 @@ convergent_values                   = missing_data_handler.get_convergent_values
 divergent_values                    = missing_data_handler.get_divergent_values()
 
 
-missing_data_handler.create_weighted_averages_plots(directory_path="img", both_graphs=1)
+missing_data_handler.create_weighted_averages_plots(directory_path="img", both_graphs=0)
 
