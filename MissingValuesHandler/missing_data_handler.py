@@ -674,8 +674,8 @@ class MissingDataHandler(object):
                 if verbose:
                     print(f"-{coordinates} graph created")                       
                 try:
-                    std = np.round(self.__standard_deviations[coordinates],2)
-                except KeyError:
+                    std = np.round(np.std(values[-self.__last_n_iterations:]),2)
+                except TypeError:
                     pass
                 row_number          = coordinates[0] 
                 variable_name       = coordinates[1]
