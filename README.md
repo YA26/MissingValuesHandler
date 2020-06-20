@@ -5,6 +5,12 @@ Random forest's definition of proximity is a solution that can be used to replac
 
 If you want to know more about how that implementation was done, you can read this article: https://medium.com/analytics-vidhya/replacing-missing-values-in-a-dataset-by-building-a-random-forest-with-python-d82d4ff24223
 
+## Dependencies
+     - Python(version>=3.6)
+     - Numpy
+     - Pandas
+     - Matplolib
+     - Tensorflow (version>=2.0)
 
 ## Do you want to give it a try?
 
