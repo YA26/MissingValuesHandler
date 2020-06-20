@@ -8,9 +8,10 @@ If you want to know more about how that implementation was done, you can read th
 ## Dependencies
 - Python(version>=3.6)
 - Numpy
-     - Pandas
-     - Matplolib
-     - Tensorflow (version>=2.0)
+- Pandas
+- Matplolib
+- Sklearn
+- Tensorflow (version>=2.0)
 
 ## Do you want to give it a try?
 
