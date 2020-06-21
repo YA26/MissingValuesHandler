@@ -7,7 +7,7 @@ from pandas import read_csv
 ############# MAIN OBJECT ##################
 ############################################
 """
-missing_data_handler = MissingDataHandler()
+missing_data_handler = MissingDataHandler(training_resilience=5)
 
 
 """
@@ -15,17 +15,17 @@ missing_data_handler = MissingDataHandler()
 ############### RUN TIME ###################
 ###################################--#########
 """
-data = read_csv(join("data","Loan_approval.csv"), sep=",", index_col=False)
+data = read_csv(join("data","Advertising.csv"), sep=",", index_col=False)
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
 missing_data_handler.set_ensemble_model_parameters(n_estimators=30, additional_estimators=2)
 
 #Launching training and getting our new dataset
 new_data = missing_data_handler.train(data=data, 
-                                      target_variable_name="Loan_Status",  
+                                      target_variable_name="sales",  
                                       n_iterations_for_convergence=5,
                                       verbose=1,
-                                      path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"),
-                                      forbidden_variables_list=["Credit_History"])
+                                      path_to_save_dataset=join("data", "Advertising_no_nan.csv"),
+                                      forbidden_variables_list=[])
 
 
 """
@@ -47,5 +47,4 @@ convergent_values                   = missing_data_handler.get_convergent_values
 divergent_values                    = missing_data_handler.get_divergent_values()
 
 
-missing_data_handler.create_weighted_averages_plots(directory_path="img", both_graphs=1)
-
+#missing_data_handler.create_weighted_averages_plots(directory_path="img", both_graphs=1, verbose=0)

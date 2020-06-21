@@ -4,7 +4,6 @@ from sklearn.preprocessing import scale
 from inspect import getsourcefile
 from os.path import join, dirname
 from numpy import sort, array
-import sys
 import pandas as pd
 import pickle
 
@@ -27,7 +26,7 @@ class DataTypeIdentifier(object):
         The basic idea here is to avoid having integers being transformed into float.
         We are using a special pandas datatype (Int64Dtype) to achieve it.
         '''
-        data = original_data.copy()
+        data = original_data.copy(deep=True)
         for column in data.columns:
             try:    
                 self.__print(f"- Feature *{column}* treated")
