@@ -13,11 +13,13 @@ If you want to know more about how that implementation was done, you can read th
 - Sklearn
 - Tensorflow (version>=2.0)
 
-## Do you want to give it a try?
+## Instructions
 
 - You can get the library with ***```pip install MissingValuesHandler```***
 
 - Import a dataset
+
+- Class instantiation: 'training_resilience' is a parameter that lets the algorithm know how many times it must keep searching for convergence when the there are still some values that didn't converge 
 
 - The type of **Random Forest is automatically handled**: if the target variable is numerical, a **RandomForestRegressor** is selected and if it is categorical, the algorithm will choose a **RandomForestClassifier**.
 
