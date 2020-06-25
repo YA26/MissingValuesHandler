@@ -94,3 +94,8 @@ missing_data_handler.create_weighted_averages_plots(directory_path="img", both_g
 """
 mds_coordinates = missing_data_handler.get_mds_coordinates(n_dimensions=3)
 missing_data_handler.show_mds_pot(mds_coordinates, plot_type="3d")
+```
+
+## 3d Multidimensional Scaling(MDS):
+Plotting the samples with the distance matrix
+![alt_text](3d_mds_plot.jpg)
