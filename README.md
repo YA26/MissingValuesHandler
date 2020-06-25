@@ -13,11 +13,13 @@ If you want to know more about how that implementation was done, you can read th
 - Sklearn
 - Tensorflow (version>=2.0)
 
-## Do you want to give it a try?
+## Instructions
 
 - You can get the library with ***```pip install MissingValuesHandler```***
 
 - Import a dataset
+
+- Class instantiation: 'training_resilience' is a parameter that lets the algorithm know how many times it must keep searching for convergence when there are still some values that didn't converge 
 
 - The type of **Random Forest is automatically handled**: if the target variable is numerical, a **RandomForestRegressor** is selected and if it is categorical, the algorithm will choose a **RandomForestClassifier**.
 
@@ -39,25 +41,24 @@ from pandas import read_csv
 ############# MAIN OBJECT ##################
 ############################################
 """
-missing_data_handler = MissingDataHandler()
-
+missing_data_handler = MissingDataHandler(training_resilience=3)
 
 """
 ############################################
 ############### RUN TIME ###################
-############################################
+###################################--#########
 """
-data = read_csv(join("data","credit_scoring.csv"), sep=",", index_col=False)
+data = read_csv(join("data","Loan_approval.csv"), sep=",", index_col=False)
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
-missing_data_handler.set_ensemble_model_parameters(n_estimators=100, additional_estimators=5)
+missing_data_handler.set_ensemble_model_parameters(n_estimators=30, additional_estimators=2)
 
 #Launching training and getting our new dataset
 new_data = missing_data_handler.train(data=data, 
-                                      target_variable_name="Status",  
+                                      target_variable_name="Loan_Status",  
                                       n_iterations_for_convergence=5,
                                       verbose=1,
-                                      path_to_save_dataset=join("data", "credit_scoring_no_nan.csv"),
-                                      forbidden_variables_list=[])
+                                      path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"),
+                                      forbidden_variables_list=["Credit_History"])
 
 
 """
@@ -75,7 +76,8 @@ encoded_target_variable             = missing_data_handler.get_target_variable_e
 final_proximity_matrix              = missing_data_handler.get_proximity_matrix()
 final_distance_matrix               = missing_data_handler.get_distance_matrix()
 weighted_averages                   = missing_data_handler.get_all_weighted_averages()
-converged_values                    = missing_data_handler.get_convergent_values()
-diverged_values                     = missing_data_handler.get_divergent_values()
+convergent_values                   = missing_data_handler.get_convergent_values()
+divergent_values                    = missing_data_handler.get_divergent_values()
+
 #Retrieve graphs depicting the evolution of missing values estimations over n iterations
-missing_data_handler.create_weighted_averages_plots(directory_path="graphs", both_graphs=0)
+#missing_data_handler.create_weighted_averages_plots(directory_path="img", both_graphs=1, verbose=0)
