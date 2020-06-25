@@ -239,7 +239,7 @@ class MissingDataHandler(object):
         return coordinates
   
       
-    def show_mds_pot(self, coordinates, plot_type="2d", path_to_save=None):
+    def show_mds_plot(self, coordinates, plot_type="2d", path_to_save=None):
         plot_type   = plot_type.lower().strip()
         filename    = ""
         if plot_type == "2d":
