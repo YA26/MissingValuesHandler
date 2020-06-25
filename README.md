@@ -102,3 +102,9 @@ We can use the **distance matrix** to plot the samples and observe how samples a
 
 We can use the **K-means algorithm** to cluster the data and analyze the features of every cluster
 ![alt_text](3d_mds_plot_k_means.jpg)
+
+
+
+## References for the algorithm:
+[1]: Leo Breiman’s website. Random Forests Leo Breiman and Adele Cutler stat.berkeley.edu/~breiman/RandomForests/cc_home.htm
+[2]: John Starmer’s video on Youtube Channel StatQuest. Random Forests Part 2: Missing data and clustering
