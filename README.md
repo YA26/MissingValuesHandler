@@ -98,5 +98,4 @@ missing_data_handler.show_mds_pot(mds_coordinates, plot_type="3d")
 
 ## 3d Multidimensional Scaling(MDS):
 We can use the distance matrix to plot the samples and observe how samples are related to one another
-![alt_text](3d_mds_plot.jpg)
-
+![alt_text](3d_mds_plot.jpg) ![alt_text](3d_mds_plot_pca.jpg)
