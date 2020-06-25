@@ -45,4 +45,21 @@ class NoMissingValuesError(Exception):
        else:
            return 'No nan values detected'
     
+    
+class TrainingResilienceValueError(Exception):
+   """Raised when training_resilience<2"""
+   
+   def __init__(self, message=None):
+       if message:
+           self.message=message
+       else:
+           self.message=None
+           
+   def __str__(self):
+       if self.message:
+           return "{}".format(self.message)
+       else:
+           return 'training_resilience must be greater or equal to 2'
+    
+              
               

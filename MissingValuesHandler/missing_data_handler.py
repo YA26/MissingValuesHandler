@@ -4,12 +4,14 @@ Created on Mon Nov  4 18:46:50 2019
 
 @author: Yann Avok
 """
-from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError
+from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
-from sklearn.preprocessing import LabelEncoder
 from collections import defaultdict, deque, Counter
+from sklearn.preprocessing import LabelEncoder
+from mpl_toolkits.mplot3d import Axes3D
 from colorama import Back, Style
+from sklearn import manifold
 from copy import copy
 import matplotlib.pyplot as plt 
 import pandas as pd
@@ -41,7 +43,7 @@ class MissingDataHandler(object):
     4- We build our model, fit it and evaluate it (we keep the model having the best out of bag score). We then use it to build the proximity matrix:
         - private method: __build_ensemble_model
         - private method: __fit_and_evaluate_ensemble_model
-        - public method : build_proximity_matrices
+        - public method : build_proximity_matrix
     
     5- We use the proximity matrix to compute weighted averages for all missing values(both in categorical and numerical variables):
         - private method: __compute_weighted_averages
@@ -57,9 +59,10 @@ class MissingDataHandler(object):
          - public  method: train
     '''
     
-    def __init__(self, training_resilience=2):  
-
-        assert training_resilience>=2, "'training_resilience' has to be greater or equal to 2" 
+    def __init__(self, training_resilience=2):        
+        if training_resilience<2:
+            raise TrainingResilienceValueError()
+            
         #Data type identifier variables
         self.__data_type_identifier_object      = DataTypeIdentifier()
         
@@ -125,21 +128,40 @@ class MissingDataHandler(object):
         '''
         Sets parameters for a random forest regressor or a random forest classifier
         ''' 
-        self.__additional_estimators            = additional_estimators
-        self.__n_estimators                     = n_estimators
-        self.__max_depth                        = max_depth
-        self.__min_samples_split                = min_samples_split 
-        self.__min_samples_leaf                 = min_samples_leaf
-        self.__min_weight_fraction_leaf         = min_weight_fraction_leaf
-        self.__max_features                     = max_features
-        self.__max_leaf_nodes                   = max_leaf_nodes
-        self.__min_impurity_decrease            = min_impurity_decrease
-        self.__min_impurity_split               = min_impurity_split
-        self.__n_jobs                           = n_jobs 
-        self.__random_state                     = random_state
-        self.__verbose                          = verbose
-         
-        
+        self.__additional_estimators        = additional_estimators
+        self.__n_estimators                 = n_estimators
+        self.__max_depth                    = max_depth
+        self.__min_samples_split            = min_samples_split 
+        self.__min_samples_leaf             = min_samples_leaf
+        self.__min_weight_fraction_leaf     = min_weight_fraction_leaf
+        self.__max_features                 = max_features
+        self.__max_leaf_nodes               = max_leaf_nodes
+        self.__min_impurity_decrease        = min_impurity_decrease
+        self.__min_impurity_split           = min_impurity_split
+        self.__n_jobs                       = n_jobs 
+        self.__random_state                 = random_state
+        self.__verbose                      = verbose
+ 
+    
+    def get_ensemble_model_parameters(self):
+        return {"n_estimators":self.__n_estimators,                
+                "additional_estimators":self.__additional_estimators,
+                "max_depth":self.__max_depth,           
+                "min_samples_split":self.__min_samples_split,                 
+                "min_samples_leaf":self.__min_samples_leaf,
+                "min_weight_fraction_leaf":self.__min_weight_fraction_leaf,         
+                "max_features":self.__max_features,                     
+                "max_leaf_nodes":self.__max_leaf_nodes,                   
+                "min_impurity_decrease":self.__min_impurity_decrease,            
+                "min_impurity_split":self.__min_impurity_split,               
+                "n_jobs":self.__n_jobs,                           
+                "random_state":self.__random_state,                     
+                "verbose":self.__verbose,                          
+                "bootstrap":self.__bootstrap,                        
+                "oob_score":self.__oob_score,                        
+                "warm_start":self.__warm_start}
+    
+    
     def get_features_type_predictions(self):
         '''
         Retrieves all features predictions type whether they are numerical or categorical.
@@ -182,7 +204,7 @@ class MissingDataHandler(object):
         '''
         Retrieves distance matrix which is equals to 1 - proximity matrix.
         '''
-        if not self.__distance_matrix:
+        if len(self.__distance_matrix)==0:
             self.__distance_matrix=1-self.__proximity_matrix
         return self.__distance_matrix
      
@@ -200,13 +222,49 @@ class MissingDataHandler(object):
         '''
         return self.__converged_values
     
+    
     def get_divergent_values(self):
         '''
         Retrieves values that were not able to converge
         '''
         return self.__all_weighted_averages
     
-
+    
+    def get_mds_coordinates(self, n_dimensions):
+        "Multi dimensional scaling plot"
+        coordinates=None
+        if len(self.__distance_matrix)!=0:
+            mds=manifold.MDS(n_components=n_dimensions, dissimilarity='precomputed')
+            coordinates=mds.fit_transform(self.__distance_matrix)
+        return coordinates
+  
+      
+    def show_mds_pot(self, coordinates, plot_type="2d", path_to_save=None):
+        plot_type   = plot_type.lower().strip()
+        filename    = ""
+        if plot_type == "2d":
+            plt.scatter(coordinates[:,0], coordinates[:,1])
+            plt.title("2D MDS PLOT")
+            plt.xlabel("MDS1")
+            plt.ylabel("MDS2") 
+            plt.show()
+            filename = "2d_mds_plot.jpg"
+        elif plot_type == "3d":
+            fig = plt.figure(figsize=(6, 6))
+            ax = fig.add_subplot(111, projection=plot_type)
+            ax.scatter(coordinates[:,0], 
+                       coordinates[:,1], 
+                       coordinates[:,2], 
+                       linewidths=1, 
+                       alpha=.7,
+                       s = 200)
+            plt.title("3D MDS PLOT")
+            plt.show()
+            filename = "3d_mds_plot.jpg"
+        if path_to_save:  
+            plt.savefig(os.path.join(path_to_save, filename))
+            
+            
     def __check_variables_name_validity(self):
         '''
         1- Verifies whether variables in 'forbidden_variables_list' or 'ordinal_variables_list' exist in the dataset. 
