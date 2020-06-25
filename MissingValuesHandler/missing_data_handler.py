@@ -785,6 +785,7 @@ class MissingDataHandler(object):
                     plt.xlabel('Iterations')
                     plt.ylabel('Values')
                     plt.savefig(os.path.join(path, filename+"_"+std_str+".jpg"))
+                    plt.close()
                 else:
                     plt.ioff()
                     plt.figure()
@@ -799,3 +800,5 @@ class MissingDataHandler(object):
                     plt.ylabel('Proportion')
                     plt.title(f"Proportions of value {coordinates} modalities after {iterations} iterations")
                     plt.savefig(os.path.join(path, filename+".jpg"))
+                    plt.close()
+                    
