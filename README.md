@@ -59,7 +59,7 @@ new_data = missing_data_handler.train(data=data,
                                       n_iterations_for_convergence=5,
                                       verbose=1,
                                       path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"),
-                                      forbidden_variables_list=[])
+                                      forbidden_variables_list=["Credit_History"])
 
 
 """
