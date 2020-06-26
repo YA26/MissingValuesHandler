@@ -2,6 +2,7 @@
 setup.cfg
 setup.py
 MissingValuesHandler\__init__.py
+MissingValuesHandler\constants.py
 MissingValuesHandler\custom_exceptions.py
 MissingValuesHandler\data_type_identifier.py
 MissingValuesHandler\missing_data_handler.py

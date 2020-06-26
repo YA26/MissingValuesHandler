@@ -4,9 +4,9 @@ Created on Mon Nov  4 18:46:50 2019
 
 @author: Yann Avok
 """
-from custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError, TrainingSetError
+from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError, TrainingSetError
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from data_type_identifier import DataTypeIdentifier
+from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
 from collections import defaultdict, deque, Counter
 from sklearn.preprocessing import LabelEncoder
 from mpl_toolkits.mplot3d import Axes3D
