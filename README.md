@@ -115,6 +115,6 @@ We can use the **K-means algorithm** to cluster the data and analyze the feature
 
 
 
-## References for the algorithm:
+## References for the supervised algorithm:
 - [1]: **Leo Breiman’s website**. Random Forests Leo Breiman and Adele Cutler **stat.berkeley.edu/~breiman/RandomForests/cc_home.htm**
 - [2]: **John Starmer’s video** on Youtube Channel StatQuest. **Random Forests Part 2: Missing data and clustering** https://youtu.be/nyxTdL_4Q-Q
