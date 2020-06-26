@@ -1,10 +1,11 @@
 # Handling missing values with a random forest automatically: missing values for the training set
 ## For supervised and unsupervised learning
 
-Random forest's definition of proximity is a solution that can be used to replace missing values in a dataset.
-
-If you want to know more about how that implementation was done, you can read this article: https://medium.com/analytics-vidhya/replacing-missing-values-in-a-dataset-by-building-a-random-forest-with-python-d82d4ff24223
-
+This library uses a random forest(regressor or classifier) to replace missing values in a dataset. It tackles:
+    - Samples having missing values in one or more features
+    - Samples having a missing target value and missing values in one or more features: both of them will be predicted and replaced.
+Samples that only have a missing target value but none in the features can be predicted with another algorithm(the main one). So it will be better to put them in a test set. and they won't be considered The main idea is to use random forest's definition of proximity to find the values that are best fit to replace the missing ones.
+    
 ## Dependencies
 - Python(version>=3.6)
 - Numpy
@@ -32,7 +33,7 @@ If you want to know more about how that implementation was done, you can read th
 
 ## Coding example:
 ```python
-from MissingValuesHandler.missing_data_handler import MissingDataHandler
+from missing_data_handler import RandomForestImputer
 from os.path import join
 from pandas import read_csv
 
@@ -41,8 +42,7 @@ from pandas import read_csv
 ############# MAIN OBJECT ##################
 ############################################
 """
-missing_data_handler = MissingDataHandler(training_resilience=3)
-
+random_forest_imputer = RandomForestImputer(training_resilience=3)
 
 """
 ############################################
@@ -50,41 +50,50 @@ missing_data_handler = MissingDataHandler(training_resilience=3)
 ############################################
 """
 data = read_csv(join("data","Loan_approval.csv"), sep=",", index_col=False)
+
+
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
-missing_data_handler.set_ensemble_model_parameters(n_estimators=80, additional_estimators=20)
+random_forest_imputer.set_ensemble_model_parameters(n_estimators=80, additional_estimators=20)
 
 #Launching training and getting our new dataset
-new_data = missing_data_handler.train(data=data, 
+new_data = random_forest_imputer.train(data=data, 
                                       target_variable_name="Loan_Status",  
                                       n_iterations_for_convergence=5,
                                       verbose=1,
                                       path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"),
                                       forbidden_variables_list=["Credit_History"])
 
-
 """
 ############################################
 ########## DATA RETRIEVAL ##################
 ############################################
 """
-features_type_prediction            = missing_data_handler.get_features_type_predictions()
-target_variable_type_prediction     = missing_data_handler.get_target_variable_type_prediction()
-encoded_features                    = missing_data_handler.get_encoded_features()
-encoded_target_variable             = missing_data_handler.get_target_variable_encoded()
-final_proximity_matrix              = missing_data_handler.get_proximity_matrix()
-final_distance_matrix               = missing_data_handler.get_distance_matrix()
-weighted_averages                   = missing_data_handler.get_all_weighted_averages()
-convergent_values                   = missing_data_handler.get_convergent_values()
-divergent_values                    = missing_data_handler.get_divergent_values()
-ensemble_model_parameters           = missing_data_handler.get_ensemble_model_parameters()
-
+features_type_prediction            = random_forest_imputer.get_features_type_predictions()
+target_variable_type_prediction     = random_forest_imputer.get_target_variable_type_prediction()
+encoded_features                    = random_forest_imputer.get_encoded_features()
+encoded_target_variable             = random_forest_imputer.get_target_variable_encoded()
+final_proximity_matrix              = random_forest_imputer.get_proximity_matrix()
+final_distance_matrix               = random_forest_imputer.get_distance_matrix()
+weighted_averages                   = random_forest_imputer.get_all_weighted_averages()
+convergent_values                   = random_forest_imputer.get_convergent_values()
+divergent_values                    = random_forest_imputer.get_divergent_values()
+ensemble_model_parameters           = random_forest_imputer.get_ensemble_model_parameters()
+target_value_predictions            = random_forest_imputer.get_target_values_predictions()
 
 """
 ############################################
 ######## WEIGHTED AVERAGES PLOT ############
 ############################################
 """
-missing_data_handler.create_weighted_averages_plots(directory_path="img", both_graphs=1, verbose=0)
+random_forest_imputer.create_weighted_averages_plots(directory_path="graphs", both_graphs=1, verbose=1)
+
+
+"""
+############################################
+######## TARGET VALUE(S) PLOT ##############
+############################################
+"""
+random_forest_imputer.create_target_pred_plot(directory_path="graphs", verbose=1)
 
 
 """
@@ -92,8 +101,8 @@ missing_data_handler.create_weighted_averages_plots(directory_path="img", both_g
 ##########      MDS PLOT    ################
 ############################################
 """
-mds_coordinates = missing_data_handler.get_mds_coordinates(n_dimensions=3)
-missing_data_handler.show_mds_plot(mds_coordinates, plot_type="3d")
+mds_coordinates = random_forest_imputer.get_mds_coordinates(n_dimensions=3)
+random_forest_imputer.show_mds_plot(mds_coordinates, plot_type="3d")
 ```
 
 ## 3d Multidimensional Scaling(MDS):
