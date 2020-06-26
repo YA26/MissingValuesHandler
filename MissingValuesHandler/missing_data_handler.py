@@ -4,9 +4,9 @@ Created on Mon Nov  4 18:46:50 2019
 
 @author: Yann Avok
 """
-from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError
+from custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError, TrainingSetError
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
+from data_type_identifier import DataTypeIdentifier
 from collections import defaultdict, deque, Counter
 from sklearn.preprocessing import LabelEncoder
 from mpl_toolkits.mplot3d import Axes3D
@@ -16,17 +16,22 @@ from copy import copy
 import matplotlib.pyplot as plt 
 import pandas as pd
 import numpy as np
+import constants
 import os
 
 
-class MissingDataHandler(object):
+class RandomForestImputer(object):
     '''
-    This class uses a random forest to replace missing values in a dataset for samples that have a target value. It doesn't tackle missing values in a new sample.
-    The main idea is to use the random forest's definition of proximity to find the values that are best fit to replace the missing ones.
+    This class uses a random forest to replace missing values in a dataset. It tackles:
+    - Samples having missing values in one or more features
+    - Samples having a missing target value and missing values in one or more features: both of them will be predicted and replaced.
+    Samples that only have a missing target value but none in the features can be predicted with another algorithm(the main one). So it will be better to put them in a test set. They won't be considered
+    The main idea is to use random forest's definition of proximity to find the values that are best fit to replace the missing ones.
     
     We have the following parts: 
 
-    1- We get the dataset, separates the features and the target variable and predict their types:
+    1- We get the dataset, isolate samples having potential missing target values, separate the features and the target variable and predict their types:
+        - private method: __isolate_samples_with_no_target_value
         - private method: __check_variables_name_validity
         - private method: __separate_features_and_target_variable
         - private method: __predict_feature_type
@@ -43,6 +48,8 @@ class MissingDataHandler(object):
     4- We build our model, fit it and evaluate it (we keep the model having the best out of bag score). We then use it to build the proximity matrix:
         - private method: __build_ensemble_model
         - private method: __fit_and_evaluate_ensemble_model
+        - private method: __fill_one_modality
+        - private method: __build_proximity_matrices
         - public method : build_proximity_matrix
     
     5- We use the proximity matrix to compute weighted averages for all missing values(both in categorical and numerical variables):
@@ -67,13 +74,14 @@ class MissingDataHandler(object):
         self.__data_type_identifier_object      = DataTypeIdentifier()
         
         #Main variables
-        self.__original_data                    = None 
+        self.__original_data                    = None
+        self.__indices_samples_no_target_value  = None
         self.__features                         = None
         self.__target_variable                  = None
-        self.__target_variable_name             = None
         self.__features_type_predictions        = None
         self.__target_variable_type_prediction  = None
-        self.__encoded_features                 = None
+        self.__encoded_features_model           = None
+        self.__encoded_features_pred            = None
         self.__target_variable_encoded          = None
         self.__proximity_matrix                 = []
         self.__distance_matrix                  = []
@@ -82,15 +90,18 @@ class MissingDataHandler(object):
         self.__missing_values_coordinates       = []
         self.__number_of_nan_values             = 0
         self.__last_n_iterations                = 0
-        self.__label_encoder                    = LabelEncoder()
+        self.__label_encoder_features           = LabelEncoder()
+        self.__label_encoder_target_variable    = LabelEncoder()
+        self.__mappings_target_variable         = defaultdict()
         self.__standard_deviations              = defaultdict()
         self.__converged_values                 = defaultdict()
         self.__all_weighted_averages            = defaultdict(list)
         self.__all_weighted_averages_copy       = defaultdict(list)
+        self.__nan_target_variable_preds        = defaultdict(list)
         self.__has_converged                    = False
         self.__training_resilience              = training_resilience
         self.__nan_values_remaining_comparator  = deque(maxlen=training_resilience)
-        
+           
         #Random forest variables
         self.__estimator                        = None
         self.__n_estimators                     = None
@@ -186,7 +197,7 @@ class MissingDataHandler(object):
     
     
     def get_encoded_features(self):
-        return self.__encoded_features
+        return self.__encoded_features_model
     
     
     def get_target_variable_encoded(self):
@@ -228,18 +239,41 @@ class MissingDataHandler(object):
         Retrieves values that were not able to converge
         '''
         return self.__all_weighted_averages
+
     
+    def get_target_values_predictions(self):
+        '''
+        Retrieves predictions of potential missing target values over the total number of iterations the algorithm took to achieve convergence
+        '''
+        if self.__nan_target_variable_preds:
+            return self.__nan_target_variable_preds
+
     
-    def get_mds_coordinates(self, n_dimensions):
-        "Multi dimensional scaling plot"
+    def get_mds_coordinates(self, n_dimensions, verbose=1):
+        '''
+        Multi dimensional scaling coordinates: reduce distance matrix to n_dimensions(< n_dimensions of distance matrix)
+        
+        Parameter:
+            n_dimensions: the number of dimensions to reduce the distance matrix to
+        '''
         coordinates=None
-        if len(self.__distance_matrix)!=0:
+        self.__print_verbose = verbose
+        if len(self.__distance_matrix)!=0 and n_dimensions<len(self.__distance_matrix):
             mds=manifold.MDS(n_components=n_dimensions, dissimilarity='precomputed')
             coordinates=mds.fit_transform(self.__distance_matrix)
+        else:
+            self.__print("Distance matrix unavailable or n_dimensions > n_dimensions of distance matrix")
         return coordinates
   
       
     def show_mds_plot(self, coordinates, plot_type="2d", path_to_save=None):
+        '''
+        2d or 3d MDS plot
+        Parameters:
+            - coordinates: MDS coordinates after dimensionality reduction
+            - plot_type [default value: 2d]: '2d' for a 2 dimensional plot and '3d' for a 3 dimensional plot
+            - path_to_save [default_value: None]
+        '''
         plot_type   = plot_type.lower().strip()
         filename    = ""
         if plot_type == "2d":
@@ -288,18 +322,35 @@ class MissingDataHandler(object):
             duplicated_variables_names      = np.where(duplicated_variables_checklist==True)[0]
             ordinal_variables_list          = np.array(self.__ordinal_variables_list)
             raise VariableNameError(f"Variable(s) {ordinal_variables_list[duplicated_variables_names]} in ordinal_variables_list can't be duplicated in forbidden_variables_list")
-     
-                  
-    def __separate_features_and_target_variable(self, target_variable_name):
-        try:    
-            self.__features             = self.__original_data.drop(target_variable_name, axis=1)
-            self.__target_variable      = self.__original_data.loc[:, target_variable_name]
-            self.__target_variable_name = target_variable_name
+    
+   
+    def __isolate_samples_with_no_target_value(self, target_variable_name):
+        '''
+        Separates samples that have a missing target value and one or multiple missing values in their features 
+        '''
+        index_for_test_set = None
+        try:
+            sample_no_target_value_checklist        = self.__original_data[target_variable_name].index[self.__original_data[target_variable_name].isnull()]
+            sample_no_target_value                  = self.__original_data.loc[sample_no_target_value_checklist]
+            features_only                           = sample_no_target_value.loc[: , sample_no_target_value.columns != target_variable_name]  
+            nan_features_no_target_value            = features_only.isnull().any(axis=1)
+            self.__indices_samples_no_target_value  = list(features_only.loc[nan_features_no_target_value].index)
+            set_samples_no_target_value             = set(self.__indices_samples_no_target_value)
+            set_nan_samples_no_target_value         = set(sample_no_target_value_checklist)
+            index_for_test_set                      = set_nan_samples_no_target_value.difference(set_samples_no_target_value)
         except KeyError:
             #We raise an exception if the name of the target variable given by the user is not found.
             raise TargetVariableNameError(f"Target variable '{target_variable_name}' does not exist!")
-     
-        
+        else:
+            if index_for_test_set:
+                raise TrainingSetError(f"Sample(s) {index_for_test_set} has no target value but no missing values in feature(s) as well. Remove {index_for_test_set} from this set: that can be predicted with another ML algorithm")
+
+
+    def __separate_features_and_target_variable(self, target_variable_name):
+            self.__features             = self.__original_data.drop(target_variable_name, axis=1)
+            self.__target_variable      = self.__original_data.loc[:, target_variable_name].copy(deep=True)
+  
+    
     def __predict_feature_type(self):
         '''
         Predicts if a feature is either categorical or numerical.
@@ -346,14 +397,14 @@ class MissingDataHandler(object):
         '''
         #Getting features that contains null values only  
         null_columns_checklist  = self.__features.isnull().any() 
-        null_columns_names      = self.__features.columns[null_columns_checklist]
+        null_columns_names      = list(self.__features.columns[null_columns_checklist])
 
         #Getting variable type predictions for features containing null values only
         null_features_type_prediction = self.__features_type_predictions.loc[null_columns_names, "Predictions"]
 
-        #Getting numerical and categorical features' names for features containing null values only
-        numerical_variables_names       = null_features_type_prediction[null_features_type_prediction=="numerical"].index
-        categorical_variables_names     = null_features_type_prediction[null_features_type_prediction=="categorical"].index
+        #Getting numerical and categorical features' names for features containing null values only numerical
+        numerical_variables_names       = null_features_type_prediction[null_features_type_prediction==constants.NUMERICAL].index
+        categorical_variables_names     = null_features_type_prediction[null_features_type_prediction==constants.CATEGORICAL].index
 
         #Calculating medians and modes
         medians         = self.__features[numerical_variables_names].median()
@@ -362,6 +413,7 @@ class MissingDataHandler(object):
 
         #Replacing initial_guesses in the dataset
         self.__features.fillna(initial_guesses, inplace=True)
+   
     
            
     def __encode_features(self):
@@ -370,11 +422,11 @@ class MissingDataHandler(object):
         1- No numerical variable will be encoded
         2- All categorical variables will be encoded as dummies by default. If one wants to encode ordinal categorical variable, he can do so by adding it to the ordinal_variables_list.
         '''
-        
+
         #Creating checklists to highlight categorical and numerical variables only.
         #Example: in 'categorical_variables_checklist', we will get 'True' if a given variable happens to be categorical.
-        categorical_variables_checklist = list(self.__features_type_predictions["Predictions"]=="categorical")
-        numerical_variables_checklist   = list(self.__features_type_predictions["Predictions"]=="numerical")
+        categorical_variables_checklist = list(self.__features_type_predictions["Predictions"]==constants.CATEGORICAL)
+        numerical_variables_checklist   = list(self.__features_type_predictions["Predictions"]==constants.NUMERICAL)
         
         #With the right checklist we get the name of the variables that are either categorical or numerical. 
         #The idea here is to separate the two different type of variables and to focus on categorical ones only.
@@ -391,7 +443,7 @@ class MissingDataHandler(object):
             ordinal_categorical_variables = categorical_variables.loc[:, self.__ordinal_variables_list] 
             
             #Label encoding ordinal categorical variables   
-            encoded_ordinal_categorical_variables = ordinal_categorical_variables.apply(self.__label_encoder.fit_transform)
+            encoded_ordinal_categorical_variables = ordinal_categorical_variables.apply(self.__label_encoder_features.fit_transform)
             
             #One-Hot encoding nominal categorical variables if they're not in forbidden_variables_list: We only keep columns that the user want to encode
             # 'a_c' stands for authorized columns
@@ -399,33 +451,60 @@ class MissingDataHandler(object):
             encoded_nominal_categorical_variables = pd.get_dummies(nominal_categorical_variables, columns=a_c)
             
             #We gather everything: numericals variables and encoded categorical ones(both ordinal and nominal)
-            self.__encoded_features = pd.concat((numerical_variables, encoded_ordinal_categorical_variables, encoded_nominal_categorical_variables), axis=1)      
+            self.__encoded_features_model = pd.concat((numerical_variables, encoded_ordinal_categorical_variables, encoded_nominal_categorical_variables), axis=1)    
         elif categorical_variables_names:
             a_c = [column_name for column_name in categorical_variables.columns if column_name not in self.__forbidden_variables_list] 
             encoded_categorical_variables = pd.get_dummies(categorical_variables, columns=a_c)
             #We gather everything: this time only the numerical variables and all nominal categorical variables
-            self.__encoded_features = pd.concat((numerical_variables, encoded_categorical_variables), axis=1)
+            self.__encoded_features_model = pd.concat((numerical_variables, encoded_categorical_variables), axis=1)
         else:
-            self.__encoded_features = self.__features
-     
+             self.__encoded_features_model = self.__features.copy(deep=True)
+       
+        """
+        Creation of two separates encoded_features sets if self.__indices_samples_no_target_value is not empty:
+        1- One to give to the model for training purposes: we remove samples that have a missing target value
+        2- Another to build the proximity matrix and compute the weighted averages: every sample is present
+        """     
+        if len(self.__indices_samples_no_target_value)!=0:
+            self.__encoded_features_pred = self.__encoded_features_model.copy(deep=True)
+            self.__encoded_features_model.drop(self.__indices_samples_no_target_value, inplace=True)
+        else:
+            self.__encoded_features_pred = self.__encoded_features_model.copy(deep=True)
+
         
-    def __encode_target_variable(self):
+    def __encode_target_variable(self, target_variable_name):
         '''
         Encodes the target variable if it is permitted by the user(i.e if the name of the variable is not in 'forbidden_variables_list').  
         If the target variable is numerical it will not be encoded so there's no need to put it in 'forbidden_variables_list'.
         The target variable will always be label encoded because the trees in the random forest aren't using it for splitting purposes.
         '''
-        #We keep the target variable unchanged if the user requires it or if it is numerical
-        self.__target_variable_encoded  = self.__target_variable
+        target_variable_cleansed = self.__target_variable.copy(deep=True)
+        #Removal of samples having a missing target_value: they will be predicted separately
+        if len(self.__indices_samples_no_target_value)!=0:
+            target_variable_cleansed.drop(self.__indices_samples_no_target_value, inplace=True)
+        self.__target_variable_encoded  = target_variable_cleansed
         #We encode it if the variable is categorical
-        if self.__target_variable_name not in self.__forbidden_variables_list and self.__target_variable_type_prediction["Predictions"].any()=="categorical":
-            self.__target_variable_encoded  = self.__label_encoder.fit_transform(self.__target_variable)
-     
+        if target_variable_name not in self.__forbidden_variables_list and self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL:
+            self.__target_variable_encoded  = self.__label_encoder_target_variable.fit_transform(target_variable_cleansed)
+            
+            
+    def __retrieve_target_variable_class_mappings(self):
+        '''
+        Returns mappings of our target variable modalities if the latter is categorical
+        '''
+        original_values  = None
+        try:
+            original_values  = self.__label_encoder_target_variable.classes_ 
+            encoded_values   = self.__label_encoder_target_variable.transform(original_values)     
+            for original_value, encoded_value in zip(original_values, encoded_values):
+                    self.__mappings_target_variable[encoded_value] = original_value
+        except AttributeError:
+            pass
+          
             
     def __build_ensemble_model(self):
             '''Builds an ensemble model: random forest classifier or regressor'''
-
-            EnsembleModel           = {"categorical":RandomForestClassifier, "numerical":RandomForestRegressor}
+            EnsembleModel           = {constants.CATEGORICAL:RandomForestClassifier, constants.NUMERICAL:RandomForestRegressor}
             target_variable_type    = self.__target_variable_type_prediction["Predictions"].any()
             self.__estimator        = EnsembleModel[target_variable_type](n_estimators=self.__n_estimators,
                                                                             max_depth=self.__max_depth, 
@@ -448,8 +527,8 @@ class MissingDataHandler(object):
     def __fit_and_evaluate_ensemble_model(self):
             '''
             Fits and evaluates the model. 
-            1- We compare the out of bag score at time t-1 with the one at time t.
-            2- If the latter is lower than the former or equals to it, we stop fitting the model and we keep the one at t-1.
+            1- We compare the out-of-bag score at iteration i-1(precedent_out_oof_bag_score) with the one at iteration i(current_out_of_bag_score).
+            2- If the latter is lower than the former or equals to it, we stop fitting the model and we keep the one at i-1.
             3- If it's the other way around, we add more estimators to the total number of estimators we currently have.
             '''  
             precedent_out_of_bag_score  = 0
@@ -457,7 +536,7 @@ class MissingDataHandler(object):
             precedent_estimator         = None
             while current_out_of_bag_score > precedent_out_of_bag_score or not current_out_of_bag_score:
                 precedent_estimator = copy(self.__estimator)
-                self.__estimator.fit(self.__encoded_features, self.__target_variable_encoded) 
+                self.__estimator.fit(self.__encoded_features_model, self.__target_variable_encoded) 
                 precedent_out_of_bag_score = current_out_of_bag_score
                 current_out_of_bag_score = self.__estimator.oob_score_
                 self.__estimator.n_estimators += self.__additional_estimators
@@ -469,8 +548,11 @@ class MissingDataHandler(object):
             self.__print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
    
     
-    def __fill_one_modality(self, predicted_modality, prediction_dataframe):
-        one_modality_proximity_matrix   = np.zeros((len(self.__encoded_features), len(self.__encoded_features)))
+    def __fill_one_modality(self, predicted_modality, prediction_dataframe, encoded_features):
+        '''
+        Handles every modality separately and construct every ad-hoc proximity matrix
+        '''
+        one_modality_proximity_matrix   = np.zeros((len(encoded_features), len(encoded_features)))
         prediction_checklist            = prediction_dataframe[0]==predicted_modality
         indices_checklist               = prediction_dataframe.index[prediction_checklist].tolist() 
         indices_checklist               = np.array(indices_checklist)
@@ -479,18 +561,18 @@ class MissingDataHandler(object):
         return one_modality_proximity_matrix
         
 
-    def __build_proximity_matrices(self, predictions):
+    def __build_proximity_matrices(self, prediction, encoded_features):
         '''
             Builds proximity matrices.
             1- We run all the data down the first tree and output predictions.
             2- If two samples fall in the same node (same predictions) we count it as 1.
             3- We do the same for every single tree, sum up the proximity matrices and divide the total by the number of estimators.
         ''' 
-        possible_predictions = predictions[0].unique()
-        if self.__target_variable_type_prediction.values[0,0] == "categorical":
+        possible_predictions = prediction[0].unique()
+        if self.__target_variable_type_prediction.values[0,0] == constants.CATEGORICAL:
             array_to_int            = np.vectorize(lambda x: np.int(x))
             possible_predictions    = array_to_int(possible_predictions)       
-        one_modality_matrix = [self.__fill_one_modality(predicted_modality, predictions) for predicted_modality in possible_predictions]
+        one_modality_matrix = [self.__fill_one_modality(predicted_modality, prediction, encoded_features) for predicted_modality in possible_predictions]
         proximity_matrix    = sum(one_modality_matrix)
         return proximity_matrix
 
@@ -501,12 +583,24 @@ class MissingDataHandler(object):
             '''
             all_estimators_list     = ensemble_estimator.estimators_
             number_of_estimators    = ensemble_estimator.n_estimators  
-            predictions             = [pd.DataFrame(estimator.predict(self.__encoded_features)) for estimator in all_estimators_list] 
-            proximity_matrices      = list(map(self.__build_proximity_matrices, predictions))
+            predictions             = [pd.DataFrame(estimator.predict(encoded_features)) for estimator in all_estimators_list] 
+            proximity_matrices      = [self.__build_proximity_matrices(prediction, encoded_features) for prediction in predictions] 
             final_proximity_matrix  = sum(proximity_matrices)/number_of_estimators
             return final_proximity_matrix
      
     
+    def __retrieve_combined_predictions(self):
+        '''
+        Predicts new values for the target variable with every estimator in the ensemble model(only if the target variable contains missing values)
+        '''
+        combined_predictions = self.__estimator.predict(self.__encoded_features_pred)
+        for index in self.__indices_samples_no_target_value:
+            if  self.__mappings_target_variable:
+                self.__nan_target_variable_preds[index].append(self.__mappings_target_variable[combined_predictions[index]])
+            else:
+                self.__nan_target_variable_preds[index].append(combined_predictions[index])
+                
+        
     def __compute_weighted_averages(self, numerical_features_decimals):
         '''
         Computes weights for every single missing value.
@@ -520,24 +614,22 @@ class MissingDataHandler(object):
             nan_sample_number   = missing_sample[0]
             nan_feature_name    = missing_sample[1]
             
-            if  self.__features_type_predictions.loc[nan_feature_name].any()=="numerical":
+            if  self.__features_type_predictions.loc[nan_feature_name].any()==constants.NUMERICAL:
                 '''
                 For every single numerical feature:
                 '''
                 #For every sample having a missing value, we get all proximities values(with other samples) and put them in the 'proximity_vector'. 
                 #We do not forget to strip the proximity value of the sample with itself(because it is always 1). This is the 'prox_values_of_other_samples'
                 proximity_vector                = self.__proximity_matrix[nan_sample_number]
-                row_to_be_stripped              = nan_sample_number
-                prox_values_of_other_samples    = np.delete(proximity_vector, row_to_be_stripped)
-                
+                prox_values_of_other_samples    = np.delete(proximity_vector, nan_sample_number)
+
                 #We compute the weight.
                 weight_vector = prox_values_of_other_samples / np.sum(prox_values_of_other_samples)
                 
                 #We get all feature's values for every other sample
                 all_other_samples_checklist = self.__features.index != nan_sample_number
                 all_other_feature_values    = self.__features.loc[all_other_samples_checklist, nan_feature_name].values
-                
-                #We compute the dot product between each feature's value and its weight
+                #We compute the dot product between each feature's value and its weight     
                 weighted_average = np.dot(all_other_feature_values, weight_vector)
                 
                 #If the values were originally integers, we could keep them that way. Otherwise, we can still choose the number of decimals.
@@ -577,21 +669,10 @@ class MissingDataHandler(object):
                 #We put every weighted frequency in the group.
                 self.__all_weighted_averages[(nan_sample_number, nan_feature_name)].append(modality_with_max_weight) 
 
-                                
-    def __replace_missing_values_in_dataframe(self):
-        '''
-        Replaces nan with new values in 'self.__encoded_features'
-        '''
-        for missing_value_coordinates, substitute in self.__all_weighted_averages.items():
-            #Getting the coordinates.
-            last_substitute = substitute[-1]
-            #Replacing values in the features dataframe.
-            self.__features.loc[missing_value_coordinates] = last_substitute
- 
-            
+
     def __compute_standard_deviations(self, n_iterations_for_convergence):
         '''
-        Computes the standard deviation of the last n substitutes
+        Computes the standard deviation of the last n substitutes for the features
         '''
         for missing_value_coordinates, substitute in self.__all_weighted_averages.items():
             last_n_substitutes = substitute[-n_iterations_for_convergence:]
@@ -605,7 +686,35 @@ class MissingDataHandler(object):
                      self.__standard_deviations[missing_value_coordinates] = 0 
                 else:
                     self.__standard_deviations[missing_value_coordinates] = 1
-     
+                            
+    def __replace_missing_values_in_features_frame(self):
+        '''
+        Replaces nan with new values in 'self.__encoded_features'
+        '''
+        for missing_value_coordinates, substitute in self.__all_weighted_averages.items():
+            #Getting the coordinates.
+            last_substitute = substitute[-1]
+            #Replacing values in the features dataframe.
+            self.__features.loc[missing_value_coordinates] = last_substitute
+
+ 
+    def __replace_missing_values_in_target_variable(self, n_iterations_for_convergence):
+        '''
+        Replaces nan values in the target values if they exist:
+            - We check at the end of training if the values have converged
+            - If they don't we replace them with the mode(for a categorical target variable) or the median (for a numerical target variable)
+        '''
+        for index, predicted_values in self.__nan_target_variable_preds.items():
+            last_n_values = predicted_values[-n_iterations_for_convergence:]
+            if (self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL and len(set(last_n_values))==1)\
+            or (self.__target_variable_type_prediction["Predictions"].any()==constants.NUMERICAL and 0<=np.std(last_n_values)<=1):
+                self.__target_variable.loc[index] = predicted_values[-1]
+            
+            if self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL:    
+                self.__target_variable.fillna(self.__target_variable.mode().iloc[0])
+            else:
+                self.__target_variable.fillna(self.__target_variable.median())
+                
 
     def __fill_with_nan(self):
         '''
@@ -614,27 +723,6 @@ class MissingDataHandler(object):
         for coordinates in self.__all_weighted_averages.keys():
            self.__features.loc[coordinates] = np.nan
  
-
-    def __remove_convergent_values(self):
-        '''
-        Checks if a given value has converged. If that's the case, the value is removed from the list 'self.__missing_values_coordinates'
-        '''
-        missing_value_coordinates = list(self.__standard_deviations.keys())         
-        for coordinates in missing_value_coordinates:
-            nan_feature_name    = coordinates[1]
-            standard_deviation  = self.__standard_deviations[coordinates]
-            if (self.__features_type_predictions.loc[nan_feature_name].any()=="numerical" and 0<=standard_deviation<1)\
-            or (self.__features_type_predictions.loc[nan_feature_name].any()=="categorical" and not standard_deviation):
-                #If a numerical or a categorical missing value converges, we keep the last value.
-                converged_value                                 = self.__all_weighted_averages[coordinates][-1] 
-                self.__converged_values[coordinates]            = converged_value
-                #We do not forget to make a copy of the nan coordinates (row, column) and their values over time(for the user).
-                self.__all_weighted_averages_copy[coordinates]  = self.__all_weighted_averages[coordinates]
-                #Removing nan values that convergedd               
-                self.__missing_values_coordinates.remove(coordinates)
-                self.__all_weighted_averages.pop(coordinates)
-                self.__standard_deviations.pop(coordinates)
-
                
     def __check_for_convergence(self):
         '''
@@ -663,6 +751,27 @@ class MissingDataHandler(object):
             self.__print("\nALL VALUES CONVERGED!\n") 
         else:       
             self.__print("\n-NOT EVERY VALUE CONVERGED. ONTO THE NEXT ROUND OF ITERATIONS...\n")
+            
+    
+    def __remove_convergent_values(self):
+        '''
+        Checks if a given value has converged. If that's the case, the value is removed from the list 'self.__missing_values_coordinates'
+        '''
+        missing_value_coordinates = list(self.__standard_deviations.keys())         
+        for coordinates in missing_value_coordinates:
+            nan_feature_name    = coordinates[1]
+            standard_deviation  = self.__standard_deviations[coordinates]
+            if (self.__features_type_predictions.loc[nan_feature_name].any()==constants.NUMERICAL and 0<=standard_deviation<=1)\
+            or (self.__features_type_predictions.loc[nan_feature_name].any()==constants.CATEGORICAL and not standard_deviation):
+                #If a numerical or a categorical missing value converges, we keep the last value.
+                converged_value                                 = self.__all_weighted_averages[coordinates][-1] 
+                self.__converged_values[coordinates]            = converged_value
+                #We do not forget to make a copy of the nan coordinates (row, column) and their values over time(for the user).
+                self.__all_weighted_averages_copy[coordinates]  = self.__all_weighted_averages[coordinates]
+                #Removing nan values that convergedd               
+                self.__missing_values_coordinates.remove(coordinates)
+                self.__all_weighted_averages.pop(coordinates)
+                self.__standard_deviations.pop(coordinates)
 
                                                   
     def __save_new_dataset(self, final_dataset, path_to_save_dataset):
@@ -699,12 +808,14 @@ class MissingDataHandler(object):
         self.__print("Getting ready...\nMaking initial guesses...\n")
         self.__original_data = data.copy(deep=True)
         self.__check_variables_name_validity()
+        self.__isolate_samples_with_no_target_value(target_variable_name)
         self.__separate_features_and_target_variable(target_variable_name)  
         self.__predict_feature_type()
         self.__predict_target_variable_type()
         self.__retrieve_nan_coordinates()
         self.__make_initial_guesses()
-        self.__encode_target_variable()
+        self.__encode_target_variable(target_variable_name)
+        self.__retrieve_target_variable_class_mappings()
         
         #Every value has to converge. Otherwise we will be here for another round of n iterations.
         while self.__has_converged==False:
@@ -723,15 +834,16 @@ class MissingDataHandler(object):
                 
                 self.__print("\n3- BUILDING PROXIMITY MATRIX...")  
                 self.__print(f"\n{Back.GREEN} {self.__estimator.n_estimators} estimators have been counted {Style.RESET_ALL}\nEach estimator is being used for predictions...")
-                self.__proximity_matrix = self.build_proximity_matrix(self.__estimator, self.__encoded_features)
-                self.__print("\nPROXIMITY MATRIX BUILT!\n")
-                      
+                self.__proximity_matrix = self.build_proximity_matrix(self.__estimator, self.__encoded_features_pred)
+                self.__print("\nPROXIMITY MATRIX BUILT!\n") 
+                self.__retrieve_combined_predictions()
+                
                 self.__print("\n4- COMPUTING WEIGHTED AVERAGES...")
                 self.__compute_weighted_averages(numerical_features_decimals)
                 self.__print("\nWEIGHTED AVERAGES COMPUTED!\n")
                         
                 self.__print("\n5- REPLACING NAN VALUES IN ENCODED DATA...")           
-                self.__replace_missing_values_in_dataframe()
+                self.__replace_missing_values_in_features_frame()
                 self.__print("\nNAN VALUES REPLACED!\n")
                 
             self.__print("\n\n##################### CHECKING FOR CONVERGENCE...#####################\n\n")
@@ -740,20 +852,53 @@ class MissingDataHandler(object):
             self.__check_for_convergence()
                 
         self.__print(f"\n- TOTAL ITERATIONS: {total_iterations}")
+        self.__replace_missing_values_in_target_variable(n_iterations_for_convergence)
         #We save the final dataset if a path is given
         final_dataset = pd.concat((self.__features, self.__target_variable), axis=1)
         self.__save_new_dataset(final_dataset, path_to_save_dataset)  
         return  final_dataset 
     
-
+    
+    def __numerical_categorical_plots(self, predicted_values, variable_type_prediction, coordinates, iterations, std, path, filename, std_str):
+        '''
+        Creates plot for numerical and categorical values
+        '''
+        if not os.path.exists(path):
+            os.makedirs(path)
+        if variable_type_prediction==constants.NUMERICAL:
+            plt.ioff()
+            plt.figure()
+            plt.title(f"Evolution of value {coordinates} over {iterations} iterations\nstd on the last {self.__last_n_iterations} iterations:{std}")
+            plt.plot(np.arange(1,iterations+1), predicted_values)
+            plt.xlabel('Iterations')
+            plt.ylabel('Values')
+            plt.savefig(os.path.join(path, filename+"_"+std_str+".jpg"))
+            plt.close()
+        else:
+            plt.ioff()
+            plt.figure()
+            data        = Counter(predicted_values)
+            names       = list(data.keys())
+            values      = list(data.values())
+            percentages = list(map(int, (values/np.sum(values))*100))
+            for i in range(len(percentages)):
+                plt.annotate(s=percentages[i], xy=(names[i], percentages[i]+1), fontsize=10)
+                plt.hlines(percentages[i], xmin=0, xmax=0)
+            plt.bar(names, percentages, align="center")
+            plt.ylabel('Proportion')
+            plt.title(f"Proportions of value {coordinates} modalities after {iterations} iterations")
+            plt.savefig(os.path.join(path, filename+".jpg"))
+            plt.close()
+                
+                
     def create_weighted_averages_plots(self, directory_path, both_graphs=0, verbose=1):
         '''
         Creates plots of nan predicted values evolution over n iterations.
         Two type of plots can be generated: for values that diverged and those that converged.
-        These are the parameters:
-            - If 'both_graphs' is set to 1, those two type of graph will be generated
-            - 'directory_path' is set to specify the path for the graphs to be stored into
-            - If 'verbose' is set to 1, messages will be displayed
+        Parameters:
+            - both_graphs[default value: 0]: If 'both_graphs' is set to 1, those two type of graph will be generated
+            - directory_path: 'directory_path' is set to specify the path for the graphs to be stored into
+            - verbose[default value: 1] If 'verbose' is set to 1, messages will be displayed
         '''
         self.__print_verbose        = verbose
         convergent_and_divergent    = [(self.__all_weighted_averages, "divergent_graphs")]
@@ -763,42 +908,52 @@ class MissingDataHandler(object):
             weighted_average_dict   = value[0]
             graph_type              = value[1]
             std                     = 0
+            std_str                 = ""
             for coordinates, values in weighted_average_dict.items():
                 self.__print(f"-{coordinates} graph created")                       
                 try:
-                    std = np.round(np.std(values[-self.__last_n_iterations:]),2)
+                    std     = np.round(np.std(values[-self.__last_n_iterations:]),2)
+                    std_str = f"std_{std}"
                 except TypeError:
                     pass
                 row_number      = coordinates[0] 
                 variable_name   = coordinates[1]
-                std_str         = f"std_{std}"
                 filename        = f"row_{row_number}_column_{variable_name}" 
                 iterations      = len(values)
                 path            = os.path.join(directory_path, graph_type, variable_name)
-                if not os.path.exists(path):
-                    os.makedirs(path)                     
-                if self.__features_type_predictions.loc[variable_name].any()=="numerical":
-                    plt.ioff()
-                    plt.figure()
-                    plt.title(f"Evolution of value {coordinates} over {iterations} iterations\nstd on the last {self.__last_n_iterations} iterations:{std}")
-                    plt.plot(np.arange(1,iterations+1), values)
-                    plt.xlabel('Iterations')
-                    plt.ylabel('Values')
-                    plt.savefig(os.path.join(path, filename+"_"+std_str+".jpg"))
-                    plt.close()
-                else:
-                    plt.ioff()
-                    plt.figure()
-                    data        = Counter(values)
-                    names       = list(data.keys())
-                    values      = list(data.values())
-                    percentages = list(map(int, (values/np.sum(values))*100))
-                    for i in range(len(percentages)):
-                        plt.annotate(s=percentages[i], xy=(names[i], percentages[i]+1), fontsize=10)
-                        plt.hlines(percentages[i], xmin=0, xmax=0)
-                    plt.bar(names, percentages, align="center")
-                    plt.ylabel('Proportion')
-                    plt.title(f"Proportions of value {coordinates} modalities after {iterations} iterations")
-                    plt.savefig(os.path.join(path, filename+".jpg"))
-                    plt.close()
-                    
+                self.__numerical_categorical_plots(values, 
+                                                   self.__features_type_predictions.loc[variable_name].any(), 
+                                                   coordinates,
+                                                   iterations,
+                                                   std, 
+                                                   path, 
+                                                   filename, 
+                                                   std_str)
+                
+                
+    def create_target_pred_plot(self, directory_path, verbose=1):
+        '''
+        Creates plots to evaluate missing target values predictions evolution 
+        '''
+        self.__print_verbose = verbose
+        for index, predicted_values in self.__nan_target_variable_preds.items():
+            std         = None
+            std_str     = ""
+            filename    = f"sample_{index}" 
+            iterations  = len(predicted_values)
+            path        = os.path.join(directory_path, "target_values_graphs")
+            self.__print(f"graph for sample {index} created")
+            try:
+                std     = np.round(np.std(predicted_values[-self.__last_n_iterations:]), 2)
+                std_str = f"std_{std}"
+            except TypeError:
+                pass
+            self.__numerical_categorical_plots(predicted_values, 
+                                               self.__target_variable_type_prediction["Predictions"].any(), 
+                                               index, 
+                                               iterations, 
+                                               std,
+                                               path, 
+                                               filename, 
+                                               std_str)
+            

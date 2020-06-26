@@ -61,5 +61,22 @@ class TrainingResilienceValueError(Exception):
        else:
            return 'training_resilience must be greater or equal to 2'
     
-              
+
+    
+class TrainingSetError(Exception):
+   """Raised when samples have a target value but no missing values in one or multiple features"""
+   
+   def __init__(self, message=None):
+       if message:
+           self.message=message
+       else:
+           self.message=None
+           
+   def __str__(self):
+       if self.message:
+           return "{}".format(self.message)
+       else:
+           return 'training_error'
+    
+                         
               
