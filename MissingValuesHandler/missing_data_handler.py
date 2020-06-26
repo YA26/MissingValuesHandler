@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
 from collections import defaultdict, deque, Counter
 from sklearn.preprocessing import LabelEncoder
+from MissingValuesHandler import constants
 from mpl_toolkits.mplot3d import Axes3D
 from colorama import Back, Style
 from sklearn import manifold
@@ -16,7 +17,6 @@ from copy import copy
 import matplotlib.pyplot as plt 
 import pandas as pd
 import numpy as np
-import constants
 import os
 
 
