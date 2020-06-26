@@ -5,7 +5,7 @@ This library uses a random forest(regressor or classifier) to replace missing va
 - Samples having missing values in one or more features
 - Samples having a missing target value and missing values in one or more features: both of them will be predicted and replaced.
 
-Samples that only have a missing target value but none in the features can be predicted with another algorithm(the main one). So it will be better to put them in a test set. and they won't be considered The main idea is to use random forest's definition of proximity to find the values that are best fit to replace the missing ones.
+Samples that only have a missing target value but none in the features can be predicted with another algorithm(the main one). So it will be better to put them in a test set and they won't be considered The main idea is to use random forest's definition of proximity to find the values that are best fit to replace the missing ones.
     
 ## Dependencies
 - Python(version>=3.6)
