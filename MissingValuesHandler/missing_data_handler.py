@@ -710,10 +710,10 @@ class RandomForestImputer(object):
             or (self.__target_variable_type_prediction["Predictions"].any()==constants.NUMERICAL and 0<=np.std(last_n_values)<=1):
                 self.__target_variable.loc[index] = predicted_values[-1]
             
-            if self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL:    
-                self.__target_variable.fillna(self.__target_variable.mode().iloc[0])
-            else:
-                self.__target_variable.fillna(self.__target_variable.median())
+        if self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL:    
+            self.__target_variable.fillna(self.__target_variable.mode().iloc[0], inplace=True)
+        else:
+            self.__target_variable.fillna(self.__target_variable.median(), inplace=True)
                 
 
     def __fill_with_nan(self):
