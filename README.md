@@ -1,5 +1,5 @@
-# Handling missing values with a random forest automatically
-## For supervised and unsupervised learning
+# Automatic RandomForestImputer: Handling missing values with a random forest automatically
+## For supervised and semi-supervised learning
 
 This library uses a random forest(regressor or classifier) to replace missing values in a dataset. It tackles:
 - Samples having missing values in one or more features
