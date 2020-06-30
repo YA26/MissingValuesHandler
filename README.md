@@ -21,16 +21,21 @@ Samples that only have a missing target value but none in the features can be pr
 
 - Import a dataset
 
-- Class instantiation: **training_resilience** is a parameter that lets the algorithm know how many times it must keep searching for convergence when there are still some values that didn't converge 
-
 - The type of **Random Forest is automatically handled**: if the target variable is numerical, a **RandomForestRegressor** is selected and if it is categorical, the algorithm will choose a **RandomForestClassifier**.
 
-- Set up the parameters of the random forest except for the **criterion** since it is also taken care of by the software: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor. 
-- Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
-- The method **train()** possesses three important arguments among others:
+- Class instantiation: **training_resilience** is a parameter that lets the algorithm know how many times it must keep searching for convergence when there are still some values that didn't converge 
+
+- The class possesses three other arguments among others:
      - **forbidden_variables_list:** variables that don't require encoding will be put in that list
      - **ordinal_variables_list:** suited for ordinal categorical variables encoding
      - **n_iterations_for_convergence:** checks after n rounds if the predicted values converged. 4 or 5 rounds are usually enough
+     
+- Set up the parameters of the random forest except for the **criterion** since it is also taken care of by the software: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor. Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
+
+- The method **train()** contains two important arguments among others:
+    - **sample_size**: allows to draw a reprensatative sample from the data(can be used when the dataset is too big)
+    - **n_quantiles**: allows to draw a representative sample from the data when the target variable is numerical(default value at 0 if the variable is categorical)
+
 
 ## Coding example:
 ```python
