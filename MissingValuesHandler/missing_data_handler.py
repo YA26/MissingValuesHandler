@@ -7,20 +7,23 @@ Created on Mon Nov  4 18:46:50 2019
 from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError, TrainingSetError
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
+from sklearn.model_selection import train_test_split
 from collections import defaultdict, deque, Counter
+from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.preprocessing import LabelEncoder
 from MissingValuesHandler import constants
 from mpl_toolkits.mplot3d import Axes3D
-from colorama import Back, Style
 from sklearn import manifold
 from copy import copy
 import matplotlib.pyplot as plt 
+import progressbar as pb
 import pandas as pd
 import numpy as np
 import os
 
 
-class RandomForestImputer(object):
+
+class RandomForestImputer(object):   
     '''
     This class uses a random forest to replace missing values in a dataset. It tackles:
     - Samples having missing values in one or more features
@@ -64,17 +67,37 @@ class RandomForestImputer(object):
     7- If all values have converged, we stop everything and save the dataset if a path has been given. 'train' is the main function:
          - private method: __save_new_dataset
          - public  method: train
-    '''
+    '''   
+    class Decorators(object):
+        @staticmethod
+        def timeit(method):
+            '''
+            timer decorator: used to time functions
+            '''
+            def timed(*args, **kwargs):
+                widgets             = [kwargs["title"], pb.Percentage(), ' ', pb.Bar(marker="#"), ' ', pb.ETA()]
+                timer               = pb.ProgressBar(widgets=widgets, max_value=100).start()
+                kwargs["update"]    = timer.update
+                kwargs["max_value"] = timer.max_value        
+                result = method(*args, **kwargs)
+                timer.finish()            
+                return result
+            return timed
+   
     
-    def __init__(self, training_resilience=2):        
+    def __init__(self, data, target_variable_name, ordinal_variables_list=None, forbidden_variables_list=None, training_resilience=2,  n_iterations_for_convergence=5):        
         if training_resilience<2:
             raise TrainingResilienceValueError()
             
-        #Data type identifier variables
+        #Data type identifier object
         self.__data_type_identifier_object      = DataTypeIdentifier()
         
         #Main variables
-        self.__original_data                    = None
+        self.__original_data                    = data.copy(deep=True)
+        self.__original_data_backup             = data.copy(deep=True)
+        self.__original_data_sampled            = pd.DataFrame()
+        self.__orginal_data_temp                = pd.DataFrame()
+        self.__data_null_index                  = None
         self.__indices_samples_no_target_value  = None
         self.__features                         = None
         self.__target_variable                  = None
@@ -85,11 +108,8 @@ class RandomForestImputer(object):
         self.__target_variable_encoded          = None
         self.__proximity_matrix                 = []
         self.__distance_matrix                  = []
-        self.__forbidden_variables_list         = []
-        self.__ordinal_variables_list           = []
         self.__missing_values_coordinates       = []
         self.__number_of_nan_values             = 0
-        self.__last_n_iterations                = 0
         self.__label_encoder_features           = LabelEncoder()
         self.__label_encoder_target_variable    = LabelEncoder()
         self.__mappings_target_variable         = defaultdict()
@@ -98,10 +118,22 @@ class RandomForestImputer(object):
         self.__all_weighted_averages            = defaultdict(list)
         self.__all_weighted_averages_copy       = defaultdict(list)
         self.__nan_target_variable_preds        = defaultdict(list)
-        self.__has_converged                    = False
+        self.__predicted_target_value           = defaultdict()
         self.__training_resilience              = training_resilience
-        self.__nan_values_remaining_comparator  = deque(maxlen=training_resilience)
-           
+        self.__nan_values_remaining_comparator  = deque(maxlen=training_resilience) 
+        self.__last_n_iterations                = n_iterations_for_convergence
+        self.__has_converged                    = False
+        self.__target_variable_name             = target_variable_name 
+        
+        if ordinal_variables_list is None:
+             self.__ordinal_variables_list = []
+        else:
+            self.__ordinal_variables_list = ordinal_variables_list
+        if forbidden_variables_list is None:
+            self.__forbidden_variables_list = []
+        else:
+            self.__forbidden_variables_list = forbidden_variables_list
+            
         #Random forest variables
         self.__estimator                        = None
         self.__n_estimators                     = None
@@ -119,14 +151,22 @@ class RandomForestImputer(object):
         self.__verbose                          = None
         self.__bootstrap                        = True
         self.__oob_score                        = True
+        self.__best_oob_score                   = 0
         self.__warm_start                       = True
         
-             
+        #Weighted averages in case of sampling
+        self.__all_weighted_averages_sample     = None
+        self.__converged_values_sample          = None
+        self.__divergent_values_sample          = None
+        self.__predicted_target_value_sample    = None
+        self.__target_value_predictions_sample  = None
+        
+     
     def set_ensemble_model_parameters(self,
                                       additional_estimators=20,
                                       n_estimators=30,
                                       max_depth=None,
-                                      min_samples_split=20, 
+                                      min_samples_split=20,
                                       min_samples_leaf=20,
                                       min_weight_fraction_leaf=0.0, 
                                       max_features='auto',
@@ -138,6 +178,20 @@ class RandomForestImputer(object):
                                       verbose=0):
         '''
         Sets parameters for a random forest regressor or a random forest classifier
+        Parameters:
+            - additional_estimators
+            - n_estimators
+            - max_depth
+            - min_samples_split
+            - min_samples_leaf
+            - min_weight_fraction_leaf
+            - max_features
+            - max_leaf_nodes
+            - min_impurity_decrease
+            - min_impurity_split
+            - n_jobs
+            - random_state
+            - verbose
         ''' 
         self.__additional_estimators        = additional_estimators
         self.__n_estimators                 = n_estimators
@@ -180,11 +234,18 @@ class RandomForestImputer(object):
         '''
         return self.__features_type_predictions
      
+     
+    def get_sample(self):
+        '''
+        Retrieves sample on which the ensemble model has been trained on
+        '''
+        if not self.__original_data_sampled.empty:
+            return self.__original_data_sampled
+        
         
     def get_target_variable_type_prediction(self):
         '''
         Retrieves prediction about the type of the target variable whether it is numerical or categorical.
-        'data_type_identifer_model' and 'data_type_identifier_object' are used to predict each type.
         '''
         return self.__target_variable_type_prediction
      
@@ -216,7 +277,7 @@ class RandomForestImputer(object):
         Retrieves distance matrix which is equals to 1 - proximity matrix.
         '''
         if len(self.__distance_matrix)==0:
-            self.__distance_matrix=1-self.__proximity_matrix
+            self.__distance_matrix = 1-self.__proximity_matrix
         return self.__distance_matrix
      
         
@@ -224,32 +285,50 @@ class RandomForestImputer(object):
         '''
         Retrieves all weighted averages that are used to replace nan values whether those come from categorical or numerical variables.
         '''
-        return self.__all_weighted_averages_copy
+        if not self.__all_weighted_averages_sample and self.__data_null_index:
+            self.__all_weighted_averages_sample = {(self.__data_null_index[coordinate[0]], coordinate[1]):predicted_value for coordinate, predicted_value in self.__all_weighted_averages_copy.items()}
+        return self.__all_weighted_averages_sample if self.__all_weighted_averages_sample else self.__all_weighted_averages_copy
     
     
     def get_convergent_values(self):
         '''
         Retrieves all nan values and their last calculated values.
         '''
-        return self.__converged_values
+        if not self.__converged_values_sample and self.__data_null_index:
+             self.__converged_values_sample = {(self.__data_null_index[coordinate[0]], coordinate[1]):predicted_value for coordinate, predicted_value in self.__converged_values.items()}
+        return self.__converged_values_sample if self.__converged_values_sample else self.__converged_values
     
     
     def get_divergent_values(self):
         '''
         Retrieves values that were not able to converge
         '''
-        return self.__all_weighted_averages
+        if not self.__divergent_values_sample and self.__data_null_index:
+             self.__divergent_values_sample = {(self.__data_null_index[coordinate[0]], coordinate[1]):predicted_value for coordinate, predicted_value in self.__all_weighted_averages.items()}
+        return self.__divergent_values_sample if self.__divergent_values_sample else self.__all_weighted_averages
 
     
-    def get_target_values_predictions(self):
+    def get_all_target_values_predictions(self):
         '''
         Retrieves predictions of potential missing target values over the total number of iterations the algorithm took to achieve convergence
         '''
         if self.__nan_target_variable_preds:
-            return self.__nan_target_variable_preds
+            if not self.__target_value_predictions_sample and self.__data_null_index:
+                self.__target_value_predictions_sample = {(self.__data_null_index[coordinate]):predicted_value for coordinate, predicted_value in self.__nan_target_variable_preds.items()}
+            return self.__target_value_predictions_sample if self.__target_value_predictions_sample else self.__nan_target_variable_preds
+ 
 
-    
-    def get_mds_coordinates(self, n_dimensions, verbose=1):
+    def get_target_value_predictions(self):
+        '''
+        Retrieves the last predicted values for the missing target values
+        '''
+        if self.__predicted_target_value:
+            if not self.__predicted_target_value_sample and self.__data_null_index:
+                self.__predicted_target_value_sample = {(self.__data_null_index[coordinate]):predicted_value for coordinate, predicted_value in self.__predicted_target_value.items()}
+            return self.__predicted_target_value_sample if self.__predicted_target_value_sample else self.__predicted_target_value
+
+        
+    def get_mds_coordinates(self, n_dimensions, distance_matrix):
         '''
         Multi dimensional scaling coordinates: reduce distance matrix to n_dimensions(< n_dimensions of distance matrix)
         
@@ -257,12 +336,11 @@ class RandomForestImputer(object):
             n_dimensions: the number of dimensions to reduce the distance matrix to
         '''
         coordinates=None
-        self.__print_verbose = verbose
-        if len(self.__distance_matrix)!=0 and n_dimensions<len(self.__distance_matrix):
+        if n_dimensions<len(distance_matrix):
             mds=manifold.MDS(n_components=n_dimensions, dissimilarity='precomputed')
-            coordinates=mds.fit_transform(self.__distance_matrix)
+            coordinates=mds.fit_transform(distance_matrix)
         else:
-            self.__print("Distance matrix unavailable or n_dimensions > n_dimensions of distance matrix")
+            print("n_dimensions > n_dimensions of distance matrix")
         return coordinates
   
       
@@ -297,7 +375,35 @@ class RandomForestImputer(object):
             filename = "3d_mds_plot.jpg"
         if path_to_save:  
             plt.savefig(os.path.join(path_to_save, filename))
-            
+      
+        
+    @Decorators.timeit
+    def __data_sampling(self, title, update, max_value, sample_size, n_quantiles):
+        if sample_size:
+            data_sampled    = None
+            data_null       = self.__original_data[self.__original_data.isnull().any(axis=1)]
+            data_no_null    = self.__original_data.dropna()
+            try:
+                self.__orginal_data_temp, data_sampled  = train_test_split(data_no_null, test_size=sample_size, random_state=42, stratify=data_no_null[self.__target_variable_name])
+            except ValueError:
+                k_bins_dis                              = KBinsDiscretizer(n_quantiles, encode="ordinal", strategy="quantile")
+                y_binned                                = k_bins_dis.fit_transform(np.array(data_no_null[self.__target_variable_name]).reshape((-1, 1)))
+                self.__orginal_data_temp, data_sampled  = train_test_split(data_no_null, test_size=sample_size, random_state=42, stratify=y_binned)           
+            self.__original_data            = pd.concat([data_sampled, data_null])
+            self.__original_data            = self.__original_data.reset_index() 
+            self.__data_null_index          = self.__original_data["index"].to_dict()
+            self.__original_data            = self.__original_data.drop("index", axis=1)
+            self.__original_data_sampled    = self.__original_data.copy(deep=True)
+      
+
+    def __reconstruct_original_data(self, final_dataset, sample_size):
+        if sample_size:
+            final_dataset = final_dataset.rename(self.__data_null_index)
+            final_dataset = pd.concat([self.__orginal_data_temp, final_dataset])
+            final_dataset.sort_index(inplace=True)
+            self.__original_data = self.__original_data_backup 
+        return final_dataset
+    
             
     def __check_variables_name_validity(self):
         '''
@@ -323,16 +429,17 @@ class RandomForestImputer(object):
             ordinal_variables_list          = np.array(self.__ordinal_variables_list)
             raise VariableNameError(f"Variable(s) {ordinal_variables_list[duplicated_variables_names]} in ordinal_variables_list can't be duplicated in forbidden_variables_list")
     
-   
-    def __isolate_samples_with_no_target_value(self, target_variable_name):
+    
+    @Decorators.timeit
+    def __isolate_samples_with_no_target_value(self, title, update, max_value):
         '''
         Separates samples that have a missing target value and one or multiple missing values in their features 
         '''
         index_for_test_set = None
         try:
-            sample_no_target_value_checklist        = self.__original_data[target_variable_name].index[self.__original_data[target_variable_name].isnull()]
+            sample_no_target_value_checklist        = self.__original_data[self.__target_variable_name].index[self.__original_data[self.__target_variable_name].isnull()]
             sample_no_target_value                  = self.__original_data.loc[sample_no_target_value_checklist]
-            features_only                           = sample_no_target_value.loc[: , sample_no_target_value.columns != target_variable_name]  
+            features_only                           = sample_no_target_value.loc[: , sample_no_target_value.columns != self.__target_variable_name]  
             nan_features_no_target_value            = features_only.isnull().any(axis=1)
             self.__indices_samples_no_target_value  = list(features_only.loc[nan_features_no_target_value].index)
             set_samples_no_target_value             = set(self.__indices_samples_no_target_value)
@@ -340,56 +447,62 @@ class RandomForestImputer(object):
             index_for_test_set                      = set_nan_samples_no_target_value.difference(set_samples_no_target_value)
         except KeyError:
             #We raise an exception if the name of the target variable given by the user is not found.
-            raise TargetVariableNameError(f"Target variable '{target_variable_name}' does not exist!")
+            raise TargetVariableNameError(f"Target variable '{self.__target_variable_name}' does not exist!")
         else:
             if index_for_test_set:
                 raise TrainingSetError(f"Sample(s) {index_for_test_set} has no target value but no missing values in feature(s) as well. Remove {index_for_test_set} from this set: that can be predicted with another ML algorithm")
 
 
-    def __separate_features_and_target_variable(self, target_variable_name):
-            self.__features             = self.__original_data.drop(target_variable_name, axis=1)
-            self.__target_variable      = self.__original_data.loc[:, target_variable_name].copy(deep=True)
+    def __separate_features_and_target_variable(self):
+            self.__features             = self.__original_data.drop(self.__target_variable_name, axis=1)
+            self.__target_variable      = self.__original_data.loc[:, self.__target_variable_name].copy(deep=True)
   
     
-    def __predict_feature_type(self):
+    @Decorators.timeit
+    def __predict_feature_type(self, title, update, max_value):
         '''
         Predicts if a feature is either categorical or numerical.
         '''
-        self.__features_type_predictions = self.__data_type_identifier_object.predict(self.__features, self.__print_verbose)
+        self.__features_type_predictions = self.__data_type_identifier_object.predict(self.__features, verbose=0)
      
         
-    def __predict_target_variable_type(self):
+    @Decorators.timeit    
+    def __predict_target_variable_type(self, title, update, max_value):
         '''
         Predicts if the target variable is either categorical or numerical.
         '''
         target_variable                        = self.__target_variable.to_frame()
-        self.__target_variable_type_prediction = self.__data_type_identifier_object.predict(target_variable, self.__print_verbose) 
+        self.__target_variable_type_prediction = self.__data_type_identifier_object.predict(target_variable, verbose=0) 
 
 
-    def __retrieve_nan_coordinates(self):
+    @Decorators.timeit
+    def __retrieve_nan_coordinates(self, title, update, max_value):
         '''
         Gets the coordinates(row and column) of every empty cell in the features dataset.
         '''
+        self.__missing_values_coordinates.clear()
         #We check if there any missing values in the dataset. If that's not the case, an exception is raised.
         if not self.__features.isnull().values.any():
             raise NoMissingValuesError("No missing values were found in the dataset!")
 
         features_nan_list   = self.__features.columns[self.__features.isnull().any()]
         features_nan        = self.__features[features_nan_list]
-           
-        for feature_nan in features_nan:  
+          
+        for iterator, feature_nan in enumerate(features_nan):  
             #We use the index to get the row coordinate of every empty cell for a given column(feature)  
             empty_cells_checklist   = self.__features[feature_nan].isnull()
             row_coordinates         = self.__features[feature_nan].index[empty_cells_checklist]
             column_coordinate       = feature_nan  
             nan_coordinates         = list(zip(row_coordinates, [column_coordinate]*len(row_coordinates)))
             self.__missing_values_coordinates.extend(nan_coordinates)
-                        
+            update(iterator*(max_value/len(features_nan)))
+                      
         #We don't forget to get the total number of missing values for future purposes.
         self.__number_of_nan_values = len(self.__missing_values_coordinates)
     
-                  
-    def __make_initial_guesses(self):
+    
+    @Decorators.timeit       
+    def __make_initial_guesses(self, title, update, max_value):
         '''
         Replaces empty cells with initial values in the features dataset:
             - mode for categorical variables 
@@ -413,16 +526,14 @@ class RandomForestImputer(object):
 
         #Replacing initial_guesses in the dataset
         self.__features.fillna(initial_guesses, inplace=True)
-   
-    
-           
+        
+            
     def __encode_features(self):
         '''
         Encodes every categorical feature the user wants to encode. Any feature mentioned in 'forbidden_variables_list' will not be considered.
         1- No numerical variable will be encoded
         2- All categorical variables will be encoded as dummies by default. If one wants to encode ordinal categorical variable, he can do so by adding it to the ordinal_variables_list.
         '''
-
         #Creating checklists to highlight categorical and numerical variables only.
         #Example: in 'categorical_variables_checklist', we will get 'True' if a given variable happens to be categorical.
         categorical_variables_checklist = list(self.__features_type_predictions["Predictions"]==constants.CATEGORICAL)
@@ -459,7 +570,7 @@ class RandomForestImputer(object):
             self.__encoded_features_model = pd.concat((numerical_variables, encoded_categorical_variables), axis=1)
         else:
              self.__encoded_features_model = self.__features.copy(deep=True)
-       
+
         """
         Creation of two separates encoded_features sets if self.__indices_samples_no_target_value is not empty:
         1- One to give to the model for training purposes: we remove samples that have a missing target value
@@ -470,9 +581,10 @@ class RandomForestImputer(object):
             self.__encoded_features_model.drop(self.__indices_samples_no_target_value, inplace=True)
         else:
             self.__encoded_features_pred = self.__encoded_features_model.copy(deep=True)
-
+              
+            
         
-    def __encode_target_variable(self, target_variable_name):
+    def __encode_target_variable(self):
         '''
         Encodes the target variable if it is permitted by the user(i.e if the name of the variable is not in 'forbidden_variables_list').  
         If the target variable is numerical it will not be encoded so there's no need to put it in 'forbidden_variables_list'.
@@ -484,7 +596,7 @@ class RandomForestImputer(object):
             target_variable_cleansed.drop(self.__indices_samples_no_target_value, inplace=True)
         self.__target_variable_encoded  = target_variable_cleansed
         #We encode it if the variable is categorical
-        if target_variable_name not in self.__forbidden_variables_list and self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL:
+        if self.__target_variable_name not in self.__forbidden_variables_list and self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL:
             self.__target_variable_encoded  = self.__label_encoder_target_variable.fit_transform(target_variable_cleansed)
             
             
@@ -501,8 +613,8 @@ class RandomForestImputer(object):
         except AttributeError:
             pass
           
-            
-    def __build_ensemble_model(self):
+    @Decorators.timeit         
+    def __build_ensemble_model(self, title, update, max_value):
             '''Builds an ensemble model: random forest classifier or regressor'''
             EnsembleModel           = {constants.CATEGORICAL:RandomForestClassifier, constants.NUMERICAL:RandomForestRegressor}
             target_variable_type    = self.__target_variable_type_prediction["Predictions"].any()
@@ -521,32 +633,34 @@ class RandomForestImputer(object):
                                                                             random_state=self.__random_state, 
                                                                             verbose=self.__verbose,
                                                                             warm_start=self.__warm_start)
+
            
 
-
-    def __fit_and_evaluate_ensemble_model(self):
+    @Decorators.timeit 
+    def __fit_and_evaluate_ensemble_model(self, title, update, max_value):
             '''
             Fits and evaluates the model. 
             1- We compare the out-of-bag score at iteration i-1(precedent_out_oof_bag_score) with the one at iteration i(current_out_of_bag_score).
             2- If the latter is lower than the former or equals to it, we stop fitting the model and we keep the one at i-1.
             3- If it's the other way around, we add more estimators to the total number of estimators we currently have.
-            '''  
+            '''
             precedent_out_of_bag_score  = 0
             current_out_of_bag_score    = 0
             precedent_estimator         = None
+       
             while current_out_of_bag_score > precedent_out_of_bag_score or not current_out_of_bag_score:
                 precedent_estimator = copy(self.__estimator)
                 self.__estimator.fit(self.__encoded_features_model, self.__target_variable_encoded) 
                 precedent_out_of_bag_score = current_out_of_bag_score
                 current_out_of_bag_score = self.__estimator.oob_score_
                 self.__estimator.n_estimators += self.__additional_estimators
-                self.__print("- Former out of bag score: {0:f}".format(precedent_out_of_bag_score))
-                self.__print("- Current out of bag score: {0:f} ".format(current_out_of_bag_score)+" /{0:+f}".format(current_out_of_bag_score-precedent_out_of_bag_score))
+                
             #We subtract the additional_estimators because we want to keep the configuration of the previous model(i.e the optimal one)
+            self.__best_oob_score = np.round(precedent_out_of_bag_score, 2)
             self.__estimator.n_estimators -= self.__additional_estimators
             self.__estimator = precedent_estimator
-            self.__print("\nModel with score {0:f} has been kept\n".format(precedent_out_of_bag_score))
-   
+
+
     
     def __fill_one_modality(self, predicted_modality, prediction_dataframe, encoded_features):
         '''
@@ -560,8 +674,8 @@ class RandomForestImputer(object):
         one_modality_proximity_matrix[indices_checklist[:, None], indices_checklist]=1
         return one_modality_proximity_matrix
         
-
-    def __build_proximity_matrices(self, prediction, encoded_features):
+    
+    def __build_proximity_matrices(self, iterator, update, max_value, predictions, prediction, encoded_features):
         '''
             Builds proximity matrices.
             1- We run all the data down the first tree and output predictions.
@@ -574,17 +688,19 @@ class RandomForestImputer(object):
             possible_predictions    = array_to_int(possible_predictions)       
         one_modality_matrix = [self.__fill_one_modality(predicted_modality, prediction, encoded_features) for predicted_modality in possible_predictions]
         proximity_matrix    = sum(one_modality_matrix)
+        update(iterator*(max_value/len(predictions)))
         return proximity_matrix
 
 
-    def build_proximity_matrix(self, ensemble_estimator, encoded_features):
+    @Decorators.timeit
+    def build_proximity_matrix(self, title, update, max_value, ensemble_estimator, encoded_features):
             '''
             Builds final proximity matrix: sum of all proximity matrices
             '''
             all_estimators_list     = ensemble_estimator.estimators_
             number_of_estimators    = ensemble_estimator.n_estimators  
             predictions             = [pd.DataFrame(estimator.predict(encoded_features)) for estimator in all_estimators_list] 
-            proximity_matrices      = [self.__build_proximity_matrices(prediction, encoded_features) for prediction in predictions] 
+            proximity_matrices      = [self.__build_proximity_matrices(iterator, update, max_value, predictions, prediction, encoded_features) for iterator, prediction in enumerate(predictions)] 
             final_proximity_matrix  = sum(proximity_matrices)/number_of_estimators
             return final_proximity_matrix
      
@@ -599,15 +715,16 @@ class RandomForestImputer(object):
                 self.__nan_target_variable_preds[index].append(self.__mappings_target_variable[combined_predictions[index]])
             else:
                 self.__nan_target_variable_preds[index].append(combined_predictions[index])
-                
-        
-    def __compute_weighted_averages(self, numerical_features_decimals):
+   
+             
+    @Decorators.timeit    
+    def __compute_weighted_averages(self, title, update, max_value, numerical_features_decimals):
         '''
         Computes weights for every single missing value.
         For categorical variables: Weighted average for the sample that has a missing value = (feature's value of every other sample * its proximity value) / all proximities values in the proximity_vector.
         For numerical variables: Weighted average for the sample that has a missing value = (modality proportion * its proximity value) / all proximities values in the proximity_vector.
         '''     
-        for missing_sample in self.__missing_values_coordinates:
+        for iterator, missing_sample in enumerate(self.__missing_values_coordinates):
             #We handle samples that contain missing values one after another. We get the coordinates of the missing sample from the encoded features.
             #'nan sample number' is the row of the sample that has a missing value.
             #'nan feature name' is the name of the feature we are currently working on.
@@ -668,14 +785,15 @@ class RandomForestImputer(object):
                                                 
                 #We put every weighted frequency in the group.
                 self.__all_weighted_averages[(nan_sample_number, nan_feature_name)].append(modality_with_max_weight) 
+            update(iterator*(max_value/len(self.__missing_values_coordinates)))
 
 
-    def __compute_standard_deviations(self, n_iterations_for_convergence):
+    def __compute_standard_deviations(self):
         '''
         Computes the standard deviation of the last n substitutes for the features
         '''
-        for missing_value_coordinates, substitute in self.__all_weighted_averages.items():
-            last_n_substitutes = substitute[-n_iterations_for_convergence:]
+        for missing_value_coordinates, substitute  in self.__all_weighted_averages.items():
+            last_n_substitutes = substitute[-self.__last_n_iterations:]
             try:
                 #Standard deviation for last n numerical values for every nan
                 self.__standard_deviations[missing_value_coordinates] = np.std(last_n_substitutes)
@@ -686,35 +804,32 @@ class RandomForestImputer(object):
                      self.__standard_deviations[missing_value_coordinates] = 0 
                 else:
                     self.__standard_deviations[missing_value_coordinates] = 1
-                            
-    def __replace_missing_values_in_features_frame(self):
+            
+         
+    @Decorators.timeit                    
+    def __replace_missing_values_in_features_frame(self, title, update, max_value):
         '''
         Replaces nan with new values in 'self.__encoded_features'
         '''
-        for missing_value_coordinates, substitute in self.__all_weighted_averages.items():
+        for iterator, weighted_averages in enumerate(self.__all_weighted_averages.items()):
+            missing_value_coordinates, substitute = weighted_averages
             #Getting the coordinates.
             last_substitute = substitute[-1]
             #Replacing values in the features dataframe.
-            self.__features.loc[missing_value_coordinates] = last_substitute
+            self.__features.loc[missing_value_coordinates] = last_substitute       
+            update(iterator*(max_value/len(self.__all_weighted_averages)))
 
- 
-    def __replace_missing_values_in_target_variable(self, n_iterations_for_convergence):
+  
+    def __replace_missing_values_in_target_variable(self):
         '''
         Replaces nan values in the target values if they exist:
             - We check at the end of training if the values have converged
             - If they don't we replace them with the mode(for a categorical target variable) or the median (for a numerical target variable)
         '''
         for index, predicted_values in self.__nan_target_variable_preds.items():
-            last_n_values = predicted_values[-n_iterations_for_convergence:]
-            if (self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL and len(set(last_n_values))==1)\
-            or (self.__target_variable_type_prediction["Predictions"].any()==constants.NUMERICAL and 0<=np.std(last_n_values)<=1):
-                self.__target_variable.loc[index] = predicted_values[-1]
-            
-        if self.__target_variable_type_prediction["Predictions"].any()==constants.CATEGORICAL:    
-            self.__target_variable.fillna(self.__target_variable.mode().iloc[0], inplace=True)
-        else:
-            self.__target_variable.fillna(self.__target_variable.median(), inplace=True)
-                
+            self.__target_variable.loc[index]           = predicted_values[-1]
+            self.__predicted_target_value[index]        = predicted_values[-1]
+                            
 
     def __fill_with_nan(self):
         '''
@@ -723,37 +838,8 @@ class RandomForestImputer(object):
         for coordinates in self.__all_weighted_averages.keys():
            self.__features.loc[coordinates] = np.nan
  
-               
-    def __check_for_convergence(self):
-        '''
-        - Checks if all values have converged 
-        - If it is the case, training stops
-        - Otherwise it will continue as long as there are improvements
-        - If there are no improvements, the resiliency factor will kick in and try  for n=training_resilience more set  of iterations.
-        - If it happens that some values converged, training will continue. Otherwise, it will stop.
-
-        '''
-        #Checking the remaing values and those that converged
-        total_nan_values        = self.__number_of_nan_values
-        nan_values_remaining    = len(self.__missing_values_coordinates)
-        nan_values_converged    = total_nan_values - nan_values_remaining
-        self.__print(f"{Back.GREEN}- {nan_values_converged} VALUE(S) CONVERGED!\n- {nan_values_remaining} VALUE(S) REMAINING!{Style.RESET_ALL}")
         
-        #Checking if there are still values that didn't converge: If that's the case we stop training and replaces them with the median/mode of the distribution they belong to
-        self.__nan_values_remaining_comparator.append(nan_values_remaining)
-        if len(set(self.__nan_values_remaining_comparator))==1 and len(self.__nan_values_remaining_comparator)==self.__training_resilience:   
-            self.__has_converged = True   
-            self.__fill_with_nan()
-            self.__make_initial_guesses()
-            self.__print(f"\n-{nan_values_remaining}/{total_nan_values} VALUES UNABLE TO CONVERGE. THE MEDIAN AND/OR THE MODE HAVE BEEN USED AS A REPLACEMENT.\n")              
-        elif not self.__missing_values_coordinates:
-            self.__has_converged = True
-            self.__print("\nALL VALUES CONVERGED!\n") 
-        else:       
-            self.__print("\n-NOT EVERY VALUE CONVERGED. ONTO THE NEXT ROUND OF ITERATIONS...\n")
-            
-    
-    def __remove_convergent_values(self):
+    def __check_and_remove_convergent_values(self):
         '''
         Checks if a given value has converged. If that's the case, the value is removed from the list 'self.__missing_values_coordinates'
         '''
@@ -772,90 +858,94 @@ class RandomForestImputer(object):
                 self.__missing_values_coordinates.remove(coordinates)
                 self.__all_weighted_averages.pop(coordinates)
                 self.__standard_deviations.pop(coordinates)
+                
+                
+    def __check_for_final_convergence(self):
+        '''
+        - Checks if all values have converged 
+        - If it is the case, training stops
+        - Otherwise it will continue as long as there are improvements
+        - If there are no improvements, the resiliency factor will kick in and try  for n=training_resilience more set  of iterations.
+        - If it happens that some values converged, training will continue. Otherwise, it will stop.
 
-                                                  
+        '''
+        #Checking the remaing values and those that converged
+        total_nan_values        = self.__number_of_nan_values
+        nan_values_remaining    = len(self.__missing_values_coordinates)
+        nan_values_converged    = total_nan_values - nan_values_remaining
+        print(f"\n\n- {nan_values_converged} VALUE(S) CONVERGED!\n- {nan_values_remaining} VALUE(S) REMAINING!")
+        
+        #Checking if there are still values that didn't converge: If that's the case we stop training and replaces them with the median/mode of the distribution they belong to
+        self.__nan_values_remaining_comparator.append(nan_values_remaining)
+        if len(set(self.__nan_values_remaining_comparator))==1 and len(self.__nan_values_remaining_comparator)==self.__training_resilience:   
+            self.__has_converged = True   
+            self.__fill_with_nan()
+            self.__make_initial_guesses(title="")
+            print(f"- {nan_values_remaining}/{total_nan_values} VALUES UNABLE TO CONVERGE. THE MEDIAN AND/OR THE MODE HAVE BEEN USED AS A REPLACEMENT")              
+        elif not self.__missing_values_coordinates:
+            self.__has_converged = True
+            print("\n- ALL VALUES CONVERGED!") 
+        else:       
+            print("- NOT EVERY VALUE CONVERGED. ONTO THE NEXT ROUND OF ITERATIONS...\n")
+            
+                                                 
     def __save_new_dataset(self, final_dataset, path_to_save_dataset):
         if path_to_save_dataset:
             final_dataset.to_csv(path_or_buf=path_to_save_dataset, index=False)
-            self.__print(f"\n- NEW DATASET SAVED in: {path_to_save_dataset}")
+            print(f"\n- NEW DATASET SAVED in: {path_to_save_dataset}")
 
-
-    def __print(self, string):
-        if self.__print_verbose:
-            print(string)
-   
+    
     def train(self, 
-            data, 
-            target_variable_name,
-            n_iterations_for_convergence=4,
-            numerical_features_decimals=0, 
-            path_to_save_dataset=None,
-            verbose=1,
-            forbidden_variables_list=[],
-            ordinal_variables_list=[]):
+              numerical_features_decimals=0, 
+              sample_size=0,
+              n_quantiles=0,
+              path_to_save_dataset=None):
         '''
         This is the main function. At run time, every other private functions will be executed one after another.
         '''
-        #Updating some of the main variables
-        self.__ordinal_variables_list   = ordinal_variables_list
-        self.__forbidden_variables_list = forbidden_variables_list
-        self.__last_n_iterations        = n_iterations_for_convergence
-        self.__has_converged            = False
-        self.__print_verbose            = verbose
-        total_iterations                = 0
-        
+        total_iterations = 0     
         #Initializing training
-        self.__print("Getting ready...\nMaking initial guesses...\n")
-        self.__original_data = data.copy(deep=True)
+        self.__data_sampling(title="[DATA SAMPLING]: ", sample_size=sample_size, n_quantiles=n_quantiles)
         self.__check_variables_name_validity()
-        self.__isolate_samples_with_no_target_value(target_variable_name)
-        self.__separate_features_and_target_variable(target_variable_name)  
-        self.__predict_feature_type()
-        self.__predict_target_variable_type()
-        self.__retrieve_nan_coordinates()
-        self.__make_initial_guesses()
-        self.__encode_target_variable(target_variable_name)
+        self.__isolate_samples_with_no_target_value(title="[ISOLATING SAMPLES WITH NO TARGET VALUE]: ")
+        self.__separate_features_and_target_variable()  
+        self.__predict_feature_type(title="[PREDICTING FEATURE TYPE]: ")
+        self.__predict_target_variable_type(title="[PREDICTING TARGET VARIABLE TYPE]: ") 
+        self.__retrieve_nan_coordinates(title="[RETRIEVING NAN COORDINATES]: ")
+        self.__make_initial_guesses(title="[MAKING INITIAL GUESSES]: ")
+        self.__encode_target_variable()
         self.__retrieve_target_variable_class_mappings()
         
         #Every value has to converge. Otherwise we will be here for another round of n iterations.
         while self.__has_converged==False:
-            for iteration in range(1, n_iterations_for_convergence + 1):
-                total_iterations += 1 
+            for iteration in range(1, self.__last_n_iterations + 1):
+                total_iterations += 1
                 self.__encode_features()
-                self.__print(f"\n##################### ROUND :{iteration} / TOTAL ROUNDS: {total_iterations} #####################\n")
-                
-                self.__print("\n1- MODEL BULDING...\n")
-                self.__build_ensemble_model()
-                self.__print("\nMODEL BUILT!\n")
-                
-                self.__print("\n2- FITTING AND EVALUATING THE MODEL...\n")
-                self.__fit_and_evaluate_ensemble_model()
-                self.__print("MODEL FITTED AND EVALUATED!")
-                
-                self.__print("\n3- BUILDING PROXIMITY MATRIX...")  
-                self.__print(f"\n{Back.GREEN} {self.__estimator.n_estimators} estimators have been counted {Style.RESET_ALL}\nEach estimator is being used for predictions...")
-                self.__proximity_matrix = self.build_proximity_matrix(self.__estimator, self.__encoded_features_pred)
-                self.__print("\nPROXIMITY MATRIX BUILT!\n") 
+                #1- MODEL BULDING
+                self.__build_ensemble_model(title=f"[{iteration}/{total_iterations}-BUILDING RANDOM FOREST]: ") 
+        
+                #2- FITTING AND EVALUATING THE MODEL
+                self.__fit_and_evaluate_ensemble_model(title=f"[{iteration}-FITTING AND EVALUATING MODEL]: ")
+            
+                #3- BUILDING PROXIMITY MATRIX
+                self.__proximity_matrix = self.build_proximity_matrix(title=f"[{iteration}-BUILDING PROXIMITY MATRIX TREES/OOB {self.__estimator.n_estimators}/{self.__best_oob_score}]: ", ensemble_estimator=self.__estimator, encoded_features=self.__encoded_features_pred)
                 self.__retrieve_combined_predictions()
-                
-                self.__print("\n4- COMPUTING WEIGHTED AVERAGES...")
-                self.__compute_weighted_averages(numerical_features_decimals)
-                self.__print("\nWEIGHTED AVERAGES COMPUTED!\n")
+       
+                #4- COMPUTING WEIGHTED AVERAGES
+                self.__compute_weighted_averages(title=f"[{iteration}-COMPUTING WEIGHTED AVERAGES]: ", numerical_features_decimals=numerical_features_decimals)
                         
-                self.__print("\n5- REPLACING NAN VALUES IN ENCODED DATA...")           
-                self.__replace_missing_values_in_features_frame()
-                self.__print("\nNAN VALUES REPLACED!\n")
-                
-            self.__print("\n\n##################### CHECKING FOR CONVERGENCE...#####################\n\n")
-            self.__compute_standard_deviations(n_iterations_for_convergence)
-            self.__remove_convergent_values()
-            self.__check_for_convergence()
-                
-        self.__print(f"\n- TOTAL ITERATIONS: {total_iterations}")
-        self.__replace_missing_values_in_target_variable(n_iterations_for_convergence)
+                #5- REPLACING NAN VALUES IN ENCODED DATA        
+                self.__replace_missing_values_in_features_frame(title=f"[{iteration}-REPLACING MISSING VALUES]: ")
+            self.__compute_standard_deviations()
+            self.__check_and_remove_convergent_values()
+            self.__check_for_final_convergence()
+        print(f"\n- TOTAL ITERATIONS: {total_iterations}")
+        self.__replace_missing_values_in_target_variable()
         #We save the final dataset if a path is given
-        final_dataset = pd.concat((self.__features, self.__target_variable), axis=1)
-        self.__save_new_dataset(final_dataset, path_to_save_dataset)  
+        final_dataset = pd.concat((self.__features, self.__target_variable), axis=1)  
+        final_dataset = self.__reconstruct_original_data(final_dataset, sample_size)
+        self.__save_new_dataset(final_dataset, path_to_save_dataset)
+        self.__has_converged=False
         return  final_dataset 
     
     
@@ -891,7 +981,7 @@ class RandomForestImputer(object):
             plt.close()
                 
                 
-    def create_weighted_averages_plots(self, directory_path, both_graphs=0, verbose=1):
+    def create_weighted_averages_plots(self, directory_path, both_graphs=0):
         '''
         Creates plots of nan predicted values evolution over n iterations.
         Two type of plots can be generated: for values that diverged and those that converged.
@@ -900,7 +990,6 @@ class RandomForestImputer(object):
             - directory_path: 'directory_path' is set to specify the path for the graphs to be stored into
             - verbose[default value: 1] If 'verbose' is set to 1, messages will be displayed
         '''
-        self.__print_verbose        = verbose
         convergent_and_divergent    = [(self.__all_weighted_averages, "divergent_graphs")]
         if both_graphs:
             convergent_and_divergent.append((self.__all_weighted_averages_copy, "convergent_graphs"))
@@ -910,7 +999,7 @@ class RandomForestImputer(object):
             std                     = 0
             std_str                 = ""
             for coordinates, values in weighted_average_dict.items():
-                self.__print(f"-{coordinates} graph created")                       
+                print(f"-{coordinates} graph created")                       
                 try:
                     std     = np.round(np.std(values[-self.__last_n_iterations:]),2)
                     std_str = f"std_{std}"
@@ -931,18 +1020,17 @@ class RandomForestImputer(object):
                                                    std_str)
                 
                 
-    def create_target_pred_plot(self, directory_path, verbose=1):
+    def create_target_pred_plot(self, directory_path):
         '''
         Creates plots to evaluate missing target values predictions evolution 
         '''
-        self.__print_verbose = verbose
         for index, predicted_values in self.__nan_target_variable_preds.items():
             std         = None
             std_str     = ""
             filename    = f"sample_{index}" 
             iterations  = len(predicted_values)
             path        = os.path.join(directory_path, "target_values_graphs")
-            self.__print(f"graph for sample {index} created")
+            print(f"graph for sample {index} created")
             try:
                 std     = np.round(np.std(predicted_values[-self.__last_n_iterations:]), 2)
                 std_str = f"std_{std}"

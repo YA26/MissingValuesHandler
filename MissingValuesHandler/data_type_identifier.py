@@ -117,7 +117,7 @@ class DataTypeIdentifier(object):
         features                = self.__build_final_set(accurately_typed_data)
         # 3- We get our predictions 
         model                   = load_model(join(dirname(getsourcefile(DataTypeIdentifier)), "data_type_identifier_model", "data_type_identifier.h5"))
-        predictions             = model.predict_classes(features)
+        predictions             = (model.predict(features) > 0.5).astype("int32")
         # 4- We label our predictions. For instance 0 represents "categorical" and 1 represents "numerical"
         mappings                = self.__load_variables(join(dirname(getsourcefile(DataTypeIdentifier)), "saved_variables", "mappings.pickle"))
         labeled_predictions     = self.__label_predictions(predictions, mappings)
