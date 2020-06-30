@@ -33,7 +33,7 @@ Samples that only have a missing target value but none in the features can be pr
 - Set up the parameters of the random forest except for the **criterion** since it is also taken care of by the software: it is **gini** or **entropy** for a random forest classifier and **mse** (mean squared error) for a regressor. Set up essential parameters like the **number of iterations**, **the additional trees**, **the base estimator**…
 
 - The method **train()** contains two important arguments among others:
-    - **sample_size**: allows to draw a reprensatative sample from the data(can be used when the dataset is too big)
+    - **sample_size**: allows to draw a representative sample from the data(can be used when the dataset is too big)
     - **n_quantiles**: allows to draw a representative sample from the data when the target variable is numerical(default value at 0 if the variable is categorical)
 
 
