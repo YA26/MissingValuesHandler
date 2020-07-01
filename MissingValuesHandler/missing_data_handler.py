@@ -453,7 +453,7 @@ class RandomForestImputer(object):
 
 
     def __separate_features_and_target_variable(self):
-            self.__features             = self.__original_data.drop(self.__target_variable_name, axis=1)
+            self.__features             = self.__original_data.drop(self.__target_variable_name, axis=1)   
             self.__target_variable      = self.__original_data.loc[:, self.__target_variable_name].copy(deep=True)
   
     
@@ -479,7 +479,6 @@ class RandomForestImputer(object):
         '''
         Gets the coordinates(row and column) of every empty cell in the features dataset.
         '''
-        self.__missing_values_coordinates.clear()
         #We check if there any missing values in the dataset. If that's not the case, an exception is raised.
         if not self.__features.isnull().values.any():
             raise NoMissingValuesError("No missing values were found in the dataset!")
@@ -568,8 +567,8 @@ class RandomForestImputer(object):
             #We gather everything: this time only the numerical variables and all nominal categorical variables
             self.__encoded_features_model = pd.concat((numerical_variables, encoded_categorical_variables), axis=1)
         else:
-             self.__encoded_features_model = self.__features.copy(deep=True)
-
+            self.__encoded_features_model = self.__features.copy(deep=True)
+   
         """
         Creation of two separates encoded_features sets if self.__indices_samples_no_target_value is not empty:
         1- One to give to the model for training purposes: we remove samples that have a missing target value
@@ -893,6 +892,12 @@ class RandomForestImputer(object):
             final_dataset.to_csv(path_or_buf=path_to_save_dataset, index=False)
             print(f"\n- NEW DATASET SAVED in: {path_to_save_dataset}")
 
+    def __reinitialize_key_vars(self):
+        self.__has_converged                = False
+        self.__original_data                = self.__original_data_backup.copy(deep=True) 
+        self.__missing_values_coordinates   =  []
+        self.__all_weighted_averages        = defaultdict(list)
+        self.__standard_deviations          = defaultdict()
     
     def train(self, 
               numerical_features_decimals=0, 
@@ -902,11 +907,11 @@ class RandomForestImputer(object):
         '''
         This is the main function. At run time, every other private functions will be executed one after another.
         '''
-        total_iterations = 0 
         #if a different sample_size/n_quantiles/path_to_save_dataset/numerical_features_decimals is chosen:
-        self.__has_converged    = False
-        self.__original_data    = self.__original_data_backup.copy(deep=True) 
+        self.__reinitialize_key_vars()
+        
         #Initializing training
+        total_iterations = 0 
         self.__data_sampling(title="[DATA SAMPLING]: ", sample_size=sample_size, n_quantiles=n_quantiles)
         self.__check_variables_name_validity()
         self.__isolate_samples_with_no_target_value(title="[ISOLATING SAMPLES WITH NO TARGET VALUE]: ")
