@@ -13,7 +13,7 @@ Samples that only have a missing target value but none in the features can be pr
 - Pandas
 - Matplolib
 - Sklearn
-- Tensorflow (version>=2.0)
+- Tensorflow (version=2.2.0)
 
 ## Instructions
 
