@@ -23,7 +23,7 @@ Samples that only have a missing target value but none in the features can be pr
 
 - The type of **Random Forest is automatically handled**: if the target variable is numerical, a **RandomForestRegressor** is selected and if it is categorical, the algorithm will choose a **RandomForestClassifier**.
 
-- Class instantiation: **training_resilience** is a parameter that lets the algorithm know how many times it must keep searching for convergence when there are still some values that didn't converge 
+- Class instantiation: **training_resilience** is a parameter that lets the algorithm know how many times it must keep striving for convergence when there are still some values that didn't converge 
 
 - The class possesses three important arguments among others:
      - **forbidden_variables_list:** variables that don't require encoding will be put in that list
