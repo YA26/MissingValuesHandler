@@ -25,7 +25,7 @@ Samples that only have a missing target value but none in the features can be pr
 
 - Class instantiation: **training_resilience** is a parameter that lets the algorithm know how many times it must keep searching for convergence when there are still some values that didn't converge 
 
-- The class possesses three important other arguments among others:
+- The class possesses three important arguments among others:
      - **forbidden_variables_list:** variables that don't require encoding will be put in that list
      - **ordinal_variables_list:** suited for ordinal categorical variables encoding
      - **n_iterations_for_convergence:** checks after n rounds if the predicted values converged. 4 or 5 rounds are usually enough
