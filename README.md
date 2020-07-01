@@ -17,7 +17,7 @@ Samples that only have a missing target value but none in the features can be pr
 
 ## Instructions
 
-- You can get the library with ***```pip install MissingValuesHandler```***
+- You can get the library with **```pip install MissingValuesHandler```**
 
 - Import a dataset
 
