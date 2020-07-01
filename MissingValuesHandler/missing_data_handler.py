@@ -7,10 +7,9 @@ Created on Mon Nov  4 18:46:50 2019
 from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError, TrainingSetError
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
+from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder
 from sklearn.model_selection import train_test_split
 from collections import defaultdict, deque, Counter
-from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.preprocessing import LabelEncoder
 from MissingValuesHandler import constants
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn import manifold
