@@ -7,9 +7,10 @@ Created on Mon Nov  4 18:46:50 2019
 from MissingValuesHandler.custom_exceptions import VariableNameError, TargetVariableNameError, NoMissingValuesError, TrainingResilienceValueError, TrainingSetError
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
-from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder
 from sklearn.model_selection import train_test_split
 from collections import defaultdict, deque, Counter
+from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.preprocessing import LabelEncoder
 from MissingValuesHandler import constants
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn import manifold
@@ -92,7 +93,7 @@ class RandomForestImputer(object):
         self.__data_type_identifier_object      = DataTypeIdentifier()
         
         #Main variables
-        self.__original_data                    = data.copy(deep=True)
+        self.__original_data                    = None
         self.__original_data_backup             = data.copy(deep=True)
         self.__original_data_sampled            = pd.DataFrame()
         self.__orginal_data_temp                = pd.DataFrame()
@@ -121,7 +122,7 @@ class RandomForestImputer(object):
         self.__training_resilience              = training_resilience
         self.__nan_values_remaining_comparator  = deque(maxlen=training_resilience) 
         self.__last_n_iterations                = n_iterations_for_convergence
-        self.__has_converged                    = False
+        self.__has_converged                    = None
         self.__target_variable_name             = target_variable_name 
         
         if ordinal_variables_list is None:
@@ -400,7 +401,6 @@ class RandomForestImputer(object):
             final_dataset = final_dataset.rename(self.__data_null_index)
             final_dataset = pd.concat([self.__orginal_data_temp, final_dataset])
             final_dataset.sort_index(inplace=True)
-            self.__original_data = self.__original_data_backup 
         return final_dataset
     
             
@@ -902,7 +902,10 @@ class RandomForestImputer(object):
         '''
         This is the main function. At run time, every other private functions will be executed one after another.
         '''
-        total_iterations = 0     
+        total_iterations = 0 
+        #if a different sample_size/n_quantiles/path_to_save_dataset/numerical_features_decimals is chosen:
+        self.__has_converged    = False
+        self.__original_data    = self.__original_data_backup.copy(deep=True) 
         #Initializing training
         self.__data_sampling(title="[DATA SAMPLING]: ", sample_size=sample_size, n_quantiles=n_quantiles)
         self.__check_variables_name_validity()
@@ -944,7 +947,6 @@ class RandomForestImputer(object):
         final_dataset = pd.concat((self.__features, self.__target_variable), axis=1)  
         final_dataset = self.__reconstruct_original_data(final_dataset, sample_size)
         self.__save_new_dataset(final_dataset, path_to_save_dataset)
-        self.__has_converged=False
         return  final_dataset 
     
     
