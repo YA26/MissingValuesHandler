@@ -64,7 +64,9 @@ class TrainingResilienceValueError(Exception):
 
     
 class TrainingSetError(Exception):
-   """Raised when samples have a target value but no missing values in one or multiple features"""
+   """Raised when samples have a target value but no missing values in one or
+   multiple features
+   """
    
    def __init__(self, message=None):
        if message:
