@@ -7,8 +7,7 @@ from pandas import read_csv
 ############# IMPORT DATA  #################
 ############################################
 """
-data = read_csv(join("data","Advertising.csv"), sep=",", index_col=False)
-
+data = read_csv(join("data","scoring.csv"), sep=",", index_col=False)
 
 """
 ############################################
@@ -17,18 +16,18 @@ data = read_csv(join("data","Advertising.csv"), sep=",", index_col=False)
 """
 #Main object
 random_forest_imputer = RandomForestImputer(data=data,
-                                            target_variable_name="sales",
+                                            target_variable_name="Status",
                                             training_resilience=3, 
-                                            n_iterations_for_convergence=5)
+                                            n_iterations_for_convergence=5,
+                                            forbidden_features_list=["Age"],
+                                            ordinal_features_list=[])
+
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
-random_forest_imputer.set_ensemble_model_parameters(n_estimators=100, additional_estimators=10)
+random_forest_imputer.set_ensemble_model_parameters(n_estimators=40, additional_estimators=10)
 
 #Launching training and getting our new dataset
-new_data = random_forest_imputer.train(sample_size=0.5, 
-                                       path_to_save_dataset=join("data", "Advertising_no_nan.csv"), 
-                                       n_quantiles=4)
-
-
+new_data = random_forest_imputer.train(sample_size=0.3, 
+                                       path_to_save_dataset=join("data", "scoring_nan.csv"))
 """
 ############################################
 ########## DATA RETRIEVAL ##################
@@ -41,12 +40,12 @@ encoded_features                    = random_forest_imputer.get_encoded_features
 encoded_target_variable             = random_forest_imputer.get_target_variable_encoded()
 final_proximity_matrix              = random_forest_imputer.get_proximity_matrix()
 final_distance_matrix               = random_forest_imputer.get_distance_matrix()
-weighted_averages                   = random_forest_imputer.get_all_weighted_averages()
-convergent_values                   = random_forest_imputer.get_convergent_values()
-divergent_values                    = random_forest_imputer.get_divergent_values()
+weighted_averages                   = random_forest_imputer.get_nan_features_predictions(option="all")
+convergent_values                   = random_forest_imputer.get_nan_features_predictions(option="conv")
+divergent_values                    = random_forest_imputer.get_nan_features_predictions(option="div")
 ensemble_model_parameters           = random_forest_imputer.get_ensemble_model_parameters()
-all_target_value_predictions        = random_forest_imputer.get_all_target_values_predictions()
-target_value_predictions            = random_forest_imputer.get_target_value_predictions()
+all_target_value_predictions        = random_forest_imputer.get_nan_target_values_predictions(option="all")
+target_value_predictions            = random_forest_imputer.get_nan_target_values_predictions(option="one")
 
 
 """
@@ -56,14 +55,12 @@ target_value_predictions            = random_forest_imputer.get_target_value_pre
 """
 random_forest_imputer.create_weighted_averages_plots(directory_path="graphs", both_graphs=1)
 
-
 """
 ############################################
 ######## TARGET VALUE(S) PLOT ##############
 ############################################
 """
 random_forest_imputer.create_target_pred_plot(directory_path="graphs")
-
 
 """
 ############################################

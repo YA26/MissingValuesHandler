@@ -1,7 +1,7 @@
 Status,Seniority,Home,Time,Age,Marital,Records,Job,Expenses,Income,Assets,Debt,Amount,Price,Savings
 good,9,rent,60,30,married,no_rec,freelance,73,129,0,0,800,846,4.2
 good,17,rent,60,58,widow,no_rec,fixed,48,131,0,0,1000,1658,4.98
-bad,10,owner,36,46,married,yes_rec,freelance,90,200,3000,0,,2985,
+,10,owner,36,46,married,yes_rec,freelance,90,200,3000,0,,2985,
 good,0,rent,60,24,single,no_rec,fixed,63,182,2500,0,900,1325,7.93
 good,0,rent,36,26,single,no_rec,fixed,46,107,0,0,310,910,7.08
 good,1,owner,60,36,married,no_rec,fixed,75,214,3500,0,650,1645,12.83
