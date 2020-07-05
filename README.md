@@ -38,7 +38,7 @@ Samples that only have a missing target value but none in the features can be pr
 
 ## Coding example:
 ```python
-from missing_data_handler import RandomForestImputer
+from MissingValuesHandler.missing_data_handler import RandomForestImputer
 from os.path import join
 from pandas import read_csv
 """
