@@ -7,7 +7,7 @@ from pandas import read_csv
 ############# IMPORT DATA  #################
 ############################################
 """
-data = read_csv(join("data","scoring.csv"), sep=",", index_col=False)
+data = read_csv(join("data","Advertising.csv"), sep=",", index_col=False)
 
 """
 ############################################
@@ -16,17 +16,17 @@ data = read_csv(join("data","scoring.csv"), sep=",", index_col=False)
 """
 #Main object
 random_forest_imputer = RandomForestImputer(data=data,
-                                            target_variable_name="Status",
-                                            training_resilience=3, 
-                                            n_iterations_for_convergence=5,
-                                            forbidden_features_list=["Age"],
+                                            target_variable_name="sales",
+                                            training_resilience=8, 
+                                            n_iterations_for_convergence=7,
+                                            forbidden_features_list=[],
                                             ordinal_features_list=[])
 
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
-random_forest_imputer.set_ensemble_model_parameters(n_estimators=40, additional_estimators=10)
+random_forest_imputer.set_ensemble_model_parameters(n_estimators=100, additional_estimators=10)
 
 #Launching training and getting our new dataset
-new_data = random_forest_imputer.train(sample_size=0.3)
+new_data = random_forest_imputer.train( n_quantiles=0, sample_size=0)
 """
 ############################################
 ########## DATA RETRIEVAL ##################
@@ -52,19 +52,19 @@ target_value_predictions            = random_forest_imputer.get_nan_target_value
 ######## WEIGHTED AVERAGES PLOT ############
 ############################################
 """
-random_forest_imputer.create_weighted_averages_plots(directory_path="graphs", both_graphs=1)
+#random_forest_imputer.create_weighted_averages_plots(directory_path="graphs", both_graphs=1)
 
 """
 ############################################
 ######## TARGET VALUE(S) PLOT ##############
 ############################################
 """
-random_forest_imputer.create_target_pred_plot(directory_path="graphs")
+#random_forest_imputer.create_target_pred_plot(directory_path="graphs")
 
 """
 ############################################
 ##########      MDS PLOT    ################
 ############################################
 """
-mds_coordinates = random_forest_imputer.get_mds_coordinates(n_dimensions=3, distance_matrix=final_distance_matrix)
-random_forest_imputer.show_mds_plot(mds_coordinates, plot_type="3d")
+#mds_coordinates = random_forest_imputer.get_mds_coordinates(n_dimensions=3, distance_matrix=final_distance_matrix)
+#random_forest_imputer.show_mds_plot(mds_coordinates, plot_type="3d")

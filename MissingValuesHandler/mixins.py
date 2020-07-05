@@ -12,7 +12,6 @@
 ******************************************************************************
 """
 from collections import defaultdict, deque, Counter
-import MissingValuesHandler.custom_exceptions as customs
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
 from sklearn.model_selection import train_test_split
@@ -22,6 +21,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy import stats as ss
 from sklearn import manifold
 from copy import copy
+import MissingValuesHandler.custom_exceptions as customs
 import MissingValuesHandler.constants as const 
 import matplotlib.pyplot as plt 
 import progressbar as pb
@@ -78,11 +78,6 @@ class DataPreprocessingMixin():
         forbidden_features_list : list, optional
             The default is None
         
-        Raises
-        ------
-        customs.TrainingResilienceValueError()
-            EXCEPTION RAISED WHEN TRAINING_RESILIENCE LOWER THAN 2
-    
         Returns
         -------
         None
@@ -631,6 +626,24 @@ class DataPreprocessingMixin():
 """
 class ModelMixin():
     def __init__(self, training_resilience, n_iterations_for_convergence):
+        """
+        Constructor 
+        
+        Parameters
+        ----------
+        training_resilience : int
+        
+        n_iterations_for_convergence : int
+
+        Raises
+        ------
+        customs.TrainingResilienceValueError()
+            EXCEPTION RAISED WHEN TRAINING_RESILIENCE LOWER THAN 2
+
+        Returns
+        -------
+        None
+        """
         if training_resilience < 2:
             raise customs.TrainingResilienceValueError()
         #Proximity/distance matrix variables
