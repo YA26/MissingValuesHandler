@@ -13,7 +13,7 @@
 """
 from collections import defaultdict, deque, Counter
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from MissingValuesHandler.data_type_identifier import DataTypeIdentifier
+from DataTypeIdentifier.data_type_identifier import DataTypeIdentifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.preprocessing import LabelEncoder
