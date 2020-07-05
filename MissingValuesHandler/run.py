@@ -1,4 +1,4 @@
-from missing_data_handler import RandomForestImputer
+from MissingValuesHandler.missing_data_handler import RandomForestImputer
 from os.path import join
 from pandas import read_csv
 
@@ -26,8 +26,7 @@ random_forest_imputer = RandomForestImputer(data=data,
 random_forest_imputer.set_ensemble_model_parameters(n_estimators=40, additional_estimators=10)
 
 #Launching training and getting our new dataset
-new_data = random_forest_imputer.train(sample_size=0.3, 
-                                       path_to_save_dataset=join("data", "scoring_nan.csv"))
+new_data = random_forest_imputer.train(sample_size=0.3)
 """
 ############################################
 ########## DATA RETRIEVAL ##################

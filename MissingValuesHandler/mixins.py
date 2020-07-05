@@ -19,7 +19,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.preprocessing import LabelEncoder
 from mpl_toolkits.mplot3d import Axes3D
-from collections import Counter
 from scipy import stats as ss
 from sklearn import manifold
 from copy import copy
