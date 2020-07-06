@@ -1412,43 +1412,6 @@ class ModelMixin():
             print(text)
             
                                                  
-    def _save_new_dataset(self, final_dataset, path_to_save_dataset):
-        """
-        Parameters
-        ----------
-        final_dataset : pandas.core.frame.DataFrame
-         
-        path_to_save_dataset : str
-
-        Returns
-        -------
-        None
-
-        """
-        if path_to_save_dataset:
-            final_dataset.to_csv(path_or_buf=path_to_save_dataset, index=False)
-            print(f"\n- NEW DATASET SAVED in: {path_to_save_dataset}")
-
-
-    def _reinitialize_key_vars(self):
-        """
-        Reinitializing vars if (decimals, sample_size, n_quantiles,
-        path_to_save_dataset) is modified.
-
-        Returns
-        -------
-        None
-
-        """
-        self._has_converged = False
-        self._original_data = self._original_data_backup.copy(deep=True) 
-        self._missing_values_coordinates = []
-        self._divergent_values = defaultdict(list)
-        self._all_weighted_averages = defaultdict(list) 
-        self._std_entropy = defaultdict()
-    
-    
-
 """
 ##############################################################################
 ##############################################################################

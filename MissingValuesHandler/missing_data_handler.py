@@ -5,6 +5,7 @@ Created on Mon Nov  4 18:46:50 2019
 @author: Yann Avok
 """
 from pandas import concat
+from collections import defaultdict
 from MissingValuesHandler.mixins import (DataPreprocessingMixin, 
                                         ModelMixin, 
                                         PlotMixin)
@@ -32,52 +33,48 @@ class RandomForestImputer(DataPreprocessingMixin, ModelMixin, PlotMixin):
         isolate samples having potential missing target values, 
         separate the features and the target variable and predict 
         their types:
-            - protected method: __data_sampling
-            - protected method: __isolate_samples_with_no_target_value
-            - protected method: __check_variables_name_validity
-            - protected method: __separate_features_and_target_variable
-            - protected method: __predict_feature_type
-            - protected method: __predict_target_variable_type
+            - protected method: _data_sampling
+            - protected method: _isolate_samples_with_no_target_value
+            - protected method: _check_variables_name_validity
+            - protected method: _separate_features_and_target_variable
+            - protected method: _predict_feature_type
+            - protected method: _predict_target_variable_type
             
         2- We retrieve the missing values coordinates(row and column) 
         and fill in the nan cells with initial values:
-            - protected method: __retrieve_nan_coordinates
-            - protected method: __make_initial_guesses
+            - protected method: _retrieve_nan_coordinates
+            - protected method: _make_initial_guesses
             
-        3- We encode the features and the target variables 
-        if they need to be encoded. As of yet, decision trees in Scikit-Learn 
+        3- We encode the features and the target variables if they 
+        need to be encoded. As of yet, decision trees in Scikit-Learn 
         don't handle categorical variables. So encoding is necessary:
-            - protected method: __encode_features
-            - protected method: __encode_target_variable
+            - protected method: _encode_features
+            - protected method: _encode_target_variable
     
     II - ModelMixin
         4- We build our model, fit it, evaluate it and we keep the model having 
         the best out of bag score. We then use it to build the proximity matrix:
-            - protected method: __build_ensemble_model
-            - protected method: __fit_and_evaluate_ensemble_model
-            - protected method: __fill_one_modality
-            - protected method: __build_proximity_matrices
+            - protected method: _build_ensemble_model
+            - protected method: _fit_and_evaluate_ensemble_model
+            - protected method: _fill_one_modality
+            - protected method: _build_proximity_matrices
             - public method : build_proximity_matrix
         
         5- We use the proximity matrix to compute weighted averages for all 
         missing values(both in categorical and numerical variables):
-            - protected method: __compute_weighted_averages
-            - protected method:__replace_missing_values_in_encoded_dataframe
+            - protected method: _compute_weighted_averages
+            - protected method: _replace_missing_values_in_encoded_dataframe
             
         6- We check if every value that has been replaced has converged after 
         n iterations. If that's not the case, we go back to step 3 and go for 
         another round of n iterations:
-            - protected method: __compute_std_and_entropy
-            - protected method: __check_for_final_convergence
-            - protected method: __replace_missing_values_in_features_frame
+            - protected method: _compute_std_and_entropy
+            - protected method: _check_for_final_convergence
+            - protected method: _replace_missing_values_in_features_frame
         
         7- We keep the last predictions for the missing target values(if any):
-            - protected method: __retrieve_combined_predictions
-            - protected method: __replace_missing_values_in_target_variable
-    
-        8- If all values have converged, we stop everything and save the dataset 
-        if a path has been given. 'train' is the main function:
-             - protected method: __save_new_dataset
+            - protected method: _retrieve_combined_predictions
+            - protected method: _replace_missing_values_in_target_variable
     
     III - PlotMixin
         - protected method: _numerical_categorical_plots
@@ -87,7 +84,9 @@ class RandomForestImputer(DataPreprocessingMixin, ModelMixin, PlotMixin):
         - public method: create_target_pred_plot
         
     IV - RandomForestImputer
-        public  method: train
+        - protected method: _save_new_dataset
+        - protected method: _reinitialize_key_vars
+        - public  method: train
         
     DATA RETRIEVAL WITH:
        - public method: get_ensemble_model_parameters
@@ -121,7 +120,42 @@ class RandomForestImputer(DataPreprocessingMixin, ModelMixin, PlotMixin):
         ModelMixin.__init__(self, 
                             training_resilience,  
                             n_iterations_for_convergence)
-        PlotMixin.__init__(self)
+
+    def _save_new_dataset(self, final_dataset, path_to_save_dataset):
+        """
+        Parameters
+        ----------
+        final_dataset : pandas.core.frame.DataFrame
+         
+        path_to_save_dataset : str
+
+        Returns
+        -------
+        None
+
+        """
+        if path_to_save_dataset:
+            final_dataset.to_csv(path_or_buf=path_to_save_dataset, index=False)
+            print(f"\n- NEW DATASET SAVED in: {path_to_save_dataset}")
+    
+
+    def _reinitialize_key_vars(self):
+        """
+        Reinitializing vars if (decimals, sample_size, n_quantiles,
+        path_to_save_dataset) is modified.
+
+        Returns
+        -------
+        None
+
+        """
+        self._has_converged = False
+        self._original_data = self._original_data_backup.copy(deep=True) 
+        self._missing_values_coordinates = []
+        self._divergent_values = defaultdict(list)
+        self._all_weighted_averages = defaultdict(list) 
+        self._std_entropy = defaultdict()
+
 
     def train(self, 
               decimals=0, 
