@@ -2,7 +2,7 @@
 """
 Created on Mon Nov  4 18:46:50 2019
 
-@author: Yann Avok
+@author: Yannick Avokandoto
 """
 from pandas import concat
 from collections import defaultdict
