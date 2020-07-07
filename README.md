@@ -14,6 +14,7 @@ Samples that only have a missing target value but none in the features can be pr
 - Matplolib
 - Sklearn
 - Tensorflow (version>=2.2.0)
+- DataTypeIdentifier
 
 ## Instructions
 
