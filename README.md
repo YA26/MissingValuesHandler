@@ -114,10 +114,10 @@ random_forest_imputer.show_mds_plot(mds_coordinates, plot_type="3d")
 
 ## 3d Multidimensional Scaling(MDS):
 We can use the **distance matrix** to plot the samples and observe how they are related to one another
-![alt_text](3d_mds_plot.jpg) 
+![alt_text](img/3d_mds_plot.jpg) 
 
 We can use the **K-means algorithm** to cluster the data and analyze the features of every cluster
-![alt_text](3d_mds_plot_k_means.jpg)
+![alt_text](img/3d_mds_plot_k_means.jpg)
 
 
 
