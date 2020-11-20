@@ -317,10 +317,7 @@ class DataPreprocessingMixin():
             target_variable = self._original_data[self._target_variable_name]
             nan_target_check = target_variable.index[target_variable.isnull()]
             nan_target = self._original_data.loc[nan_target_check]
-            features_check = nan_target.columns != self._target_variable_name
-            features = nan_target.loc[: , features_check]  
-            nan_features = features.isnull().any(axis=1)
-            nan_idx = nan_features.loc[nan_features].index
+            nan_idx = nan_target.index
             self._idx_no_target_value = list(nan_idx)
         except KeyError:
             text = (f"Target variable '{self._target_variable_name}'"
