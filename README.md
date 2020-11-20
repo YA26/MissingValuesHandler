@@ -67,7 +67,7 @@ random_forest_imputer.set_ensemble_model_parameters(n_estimators=40, additional_
 
 #Launching training and getting our new dataset
 new_data = random_forest_imputer.train(sample_size=0.3, 
-                                       path_to_save_dataset=join("data", "scoring_nan.csv"))
+                                       path_to_save_dataset=join("data", "Loan_approval_no_nan.csv"))
 """
 ############################################
 ########## DATA RETRIEVAL ##################
