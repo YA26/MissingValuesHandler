@@ -313,7 +313,6 @@ class DataPreprocessingMixin():
         -------
         None
         """
-        diff_idx = None
         try:
             target_variable = self._original_data[self._target_variable_name]
             nan_target_check = target_variable.index[target_variable.isnull()]
@@ -322,21 +321,11 @@ class DataPreprocessingMixin():
             features = nan_target.loc[: , features_check]  
             nan_features = features.isnull().any(axis=1)
             nan_idx = nan_features.loc[nan_features].index
-            samples_nan_target_value = set(nan_idx)
-            nan_samples_target_value = set(nan_target_check)
-            diff_idx = nan_samples_target_value.difference(samples_nan_target_value)
             self._idx_no_target_value = list(nan_idx)
         except KeyError:
             text = (f"Target variable '{self._target_variable_name}'"
                     " does not exist!")
             raise customs.TargetVariableNameError(text)
-        else:
-            if diff_idx:
-                text = (f"No target value in sample(s) {diff_idx} but no"
-                        " missing values in feature(s) as well. Remove"
-                        f" {diff_idx} from this set: that can be"
-                        " predicted with another ML algorithm")
-                raise customs.TrainingSetError(text)
 
 
     def _separate_features_and_target_variable(self):
