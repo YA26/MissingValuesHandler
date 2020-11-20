@@ -47,7 +47,7 @@ from pandas import read_csv
 ############# IMPORT DATA  #################
 ############################################
 """
-data = read_csv(join("data","scoring.csv"), sep=",", index_col=False)
+data = read_csv(join("data","Loan_approval.csv"), sep=",", index_col=False)
 
 """
 ############################################
@@ -59,7 +59,7 @@ random_forest_imputer = RandomForestImputer(data=data,
                                             target_variable_name="Status",
                                             training_resilience=3, 
                                             n_iterations_for_convergence=5,
-                                            forbidden_features_list=["Age"],
+                                            forbidden_features_list=["Credit_History"],
                                             ordinal_features_list=[])
 
 #Setting the ensemble model parameters: it could be a random forest regressor or classifier
