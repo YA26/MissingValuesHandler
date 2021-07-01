@@ -129,6 +129,21 @@ class DataPreprocessingMixin():
         """
         return self._features_type_predictions
      
+    def set_features_type_predictions(self, features_type_predictions):
+        """
+
+        Parameters
+        ----------
+        features_type_predictions : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        self._features_type_predictions = features_type_predictions
+       
      
     def get_sample(self):
         """
@@ -151,7 +166,23 @@ class DataPreprocessingMixin():
         pandas.core.frame.DataFrame
         """
         return self._target_var_type_prediction
+    
+    
+    def set_target_variable_type_prediction(self, target_var_type_prediction):
+        """
+        
 
+        Parameters
+        ----------
+        target_var_type_prediction : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        self._target_var_type_prediction = target_var_type_prediction
 
     def get_encoded_features(self):
         """
