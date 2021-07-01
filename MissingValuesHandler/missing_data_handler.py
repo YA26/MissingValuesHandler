@@ -192,9 +192,9 @@ class RandomForestImputer(DataPreprocessingMixin, ModelMixin, PlotMixin):
         self._isolate_samples_with_no_target_value(title="[ISOLATING SAMPLES"\
                                                     "WITH NO TARGET VALUE]: ")
         self._separate_features_and_target_variable()  
-        if not self._predict_feature_type:
+        if not self._features_type_predictions:
             self._predict_feature_type(title="[PREDICTING FEATURE TYPE]: ")
-        if not self._predict_target_variable_type:
+        if not self._target_var_type_prediction:
             self._predict_target_variable_type(title="[PREDICTING TARGET VARIABLE"\
                                                        "TYPE]: ") 
         self._retrieve_nan_coordinates(title="[RETRIEVING NAN COORDINATES]: ")
@@ -241,3 +241,6 @@ class RandomForestImputer(DataPreprocessingMixin, ModelMixin, PlotMixin):
         self._save_new_dataset(final_dataset, path_to_save_dataset)
         return  final_dataset 
 
+    
+    
+    
